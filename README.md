@@ -94,11 +94,8 @@ corresponding subdirectory.
 For script usage details, including environment variables and Docker
 instructions, see [code/README.md](code/README.md).
 
-## 📚 Acknowledgements & citations
-
-If you use **MyBidsApp** or any local scripts from this repository, **please cite the authors of those tools and acknowledge this repository**.
-
 ## 📚 Citations & acknowledgements
+If you use **MyBidsApp** or any local scripts from this repository, **please cite the authors of those tools and acknowledge this repository**.
 
 - **BIDS Validator** – Gorgolewski K.J., et al. *Sci Data* 2016;3:160044. doi:10.1038/sdata.2016.44  
 - **Boutiques** – Glatard T., et al. *GigaScience* 2018;7:giy016. doi:10.1093/gigascience/giy016  
