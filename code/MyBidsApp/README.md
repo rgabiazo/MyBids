@@ -167,10 +167,10 @@ bids cbrain --download-tool hippunfold --group-id 98765 --flatten
 
 ## 📝 Acknowledgements & citations
 
-* **BIDS Validator** – Gorgolewski et al., *Sci Data* 2016, doi:10.1038/sdata.2016.44
+* **BIDS Validator** – Gorgolewski et al. *Sci Data* 2016, doi:10.1038/sdata.2016.44
 * **CBRAIN** – Sherif et al., *Front Neuroinf* 2014, doi:10.3389/fninf.2014.00054
-* **hippunfold** – de Kraker et al., *eLife* 2023, doi:10.7554/eLife.69982
-* **dcm2niix** – Li et al., *Front Neuroinf* 2016, doi:10.3389/fninf.2016.00030
+* **hippunfold** – de Kraker et al. *eLife* 2023, doi:10.7554/eLife.69982
+* **dcm2niix** – Li et al. *Front Neuroinf* 2016, doi:10.3389/fninf.2016.00030
 
 If you use `MyBidsApp` in your research, please cite the relevant upstream tools as well as this repository.
 
