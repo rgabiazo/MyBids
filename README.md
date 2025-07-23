@@ -103,7 +103,7 @@ If you use **MyBidsApp** or any local scripts from this repository, **please cit
 - **dcm2niix** – Li X., et al. *Front Neuroinform* 2016;10:30. doi:10.3389/fninf.2016.00030  
 - **FreeSurfer** – Fischl B. *NeuroImage* 2012;62:774‑781. doi:10.1016/j.neuroimage.2012.01.021  
 - **FSL** – Jenkinson M., et al. *NeuroImage* 2012;62:782‑790. doi:10.1016/j.neuroimage.2011.09.015  
-- **hippunfold** – de Kraker L., et al. *eLife* 2023;12:e69982. doi:10.7554/eLife.69982  
+- **HippUnfold** – de Kraker L., et al. *eLife* 2022;11:e77945. doi:10.7554/eLife.77945 
 - **ICA‑AROMA** – Pruim R.H.R., et al. *NeuroImage* 2015;112:267‑277. doi:10.1016/j.neuroimage.2015.02.064  
 - **SynthStrip** – Hoopes A., et al. *NeuroImage* 2022;260:119474. doi:10.1016/j.neuroimage.2022.119474   
 
