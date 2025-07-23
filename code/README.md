@@ -603,10 +603,10 @@ Create or update a `dataset_description.json` in a derivative directory.
 
 ## Citations & acknowledgements
 
-* **ICA‑AROMA** – Pruim R.H.R., et al. *NeuroImage* 2015;112:267‑277. https://doi.org/10.1016/j.neuroimage.2015.02.064  
-* **FSL** – Jenkinson M., et al. *NeuroImage* 2012;62(2):782‑790. https://doi.org/10.1016/j.neuroimage.2011.09.015  
-* **FreeSurfer** – Fischl B. *NeuroImage* 2012;62(2):774‑781. https://doi.org/10.1016/j.neuroimage.2012.01.021  
-* **SynthStrip** – Hoopes A., et al. *NeuroImage* 2022;260:119474. https://doi.org/10.1016/j.neuroimage.2022.119474  
+* **ICA‑AROMA** – Pruim R.H.R., et al. *NeuroImage* 2015;112:267‑277. doi:10.1016/j.neuroimage.2015.02.064  
+* **FSL** – Jenkinson M., et al. *NeuroImage* 2012;62(2):782‑790. doi:10.1016/j.neuroimage.2011.09.015  
+* **FreeSurfer** – Fischl B. *NeuroImage* 2012;62(2):774‑781. doi:10.1016/j.neuroimage.2012.01.021  
+* **SynthStrip** – Hoopes A., et al. *NeuroImage* 2022;260:119474. doi:10.1016/j.neuroimage.2022.119474  
 
 # License
 
