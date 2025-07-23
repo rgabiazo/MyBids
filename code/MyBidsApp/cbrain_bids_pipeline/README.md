@@ -454,10 +454,10 @@ defaults to 60 seconds.
 
 ## 📚  Citations & acknowledgements
 
-* **CBRAIN** – Sherif T., et al. *Front. Neuroinform.* 2014;8:54. 
-* **Boutiques** – Glatard T., et al. *GigaScience* 2018;7(5)\:giy016.
-* **BIDS** – Gorgolewski K.J., et al. *Sci. Data* 2016;3:160044.
-* **HippUnfold** – de Kraker L., et al. *eLife* 2023;12\:e82835.
+* **CBRAIN** – Sherif T., et al. *Front Neuroinform* 2014;8:54. doi:10.3389/fninf.2014.00054  
+* **Boutiques** – Glatard T., et al. *GigaScience* 2018;7:giy016. doi:10.1093/gigascience/giy016  
+* **BIDS** – Gorgolewski K.J., et al. *Sci Data* 2016;3:160044. doi:10.1038/sdata.2016.44  
+* **HippUnfold** – de Kraker L., et al. *eLife* 2022;11:e77945. doi:10.7554/eLife.77945  
 
 We thank the **McGill Centre for Integrative Neuroscience** and **Pierre Rioux** for providing the CBRAIN infrastructure and assistance.
 
