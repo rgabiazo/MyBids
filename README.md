@@ -100,15 +100,15 @@ If you use **MyBidsApp** or any local scripts from this repository, **please cit
 
 ## 📚 Citations & acknowledgements
 
-- **BIDS Validator** – Gorgolewski K.J., et al. *Sci Data* 2016;3:160044. https://doi.org/10.1038/sdata.2016.44  
-- **Boutiques** – Glatard T., et al. *GigaScience* 2018;7:giy016. https://doi.org/10.1093/gigascience/giy016  
-- **CBRAIN** – Sherif T., et al. *Front Neuroinform* 2014;8:54. https://doi.org/10.3389/fninf.2014.00054  
-- **dcm2niix** – Li X., et al. *Front Neuroinform* 2016;10:30. https://doi.org/10.3389/fninf.2016.00030  
-- **FreeSurfer** – Fischl B. *NeuroImage* 2012;62:774‑781. https://doi.org/10.1016/j.neuroimage.2012.01.021  
-- **FSL** – Jenkinson M., et al. *NeuroImage* 2012;62:782‑790. https://doi.org/10.1016/j.neuroimage.2011.09.015  
-- **hippunfold** – de Kraker L., et al. *eLife* 2023;12:e69982. https://doi.org/10.7554/eLife.69982  
-- **ICA‑AROMA** – Pruim R.H.R., et al. *NeuroImage* 2015;112:267‑277. https://doi.org/10.1016/j.neuroimage.2015.02.064  
-- **SynthStrip** – Hoopes A., et al. *NeuroImage* 2022;260:119474. https://doi.org/10.1016/j.neuroimage.2022.119474  
+- **BIDS Validator** – Gorgolewski K.J., et al. *Sci Data* 2016;3:160044. doi:10.1038/sdata.2016.44  
+- **Boutiques** – Glatard T., et al. *GigaScience* 2018;7:giy016. doi:10.1093/gigascience/giy016  
+- **CBRAIN** – Sherif T., et al. *Front Neuroinform* 2014;8:54. doi:10.3389/fninf.2014.00054  
+- **dcm2niix** – Li X., et al. *Front Neuroinform* 2016;10:30. doi:10.3389/fninf.2016.00030  
+- **FreeSurfer** – Fischl B. *NeuroImage* 2012;62:774‑781. doi:10.1016/j.neuroimage.2012.01.021  
+- **FSL** – Jenkinson M., et al. *NeuroImage* 2012;62:782‑790. doi:10.1016/j.neuroimage.2011.09.015  
+- **hippunfold** – de Kraker L., et al. *eLife* 2023;12:e69982. doi:10.7554/eLife.69982  
+- **ICA‑AROMA** – Pruim R.H.R., et al. *NeuroImage* 2015;112:267‑277. doi:10.1016/j.neuroimage.2015.02.064  
+- **SynthStrip** – Hoopes A., et al. *NeuroImage* 2022;260:119474. doi:10.1016/j.neuroimage.2022.119474   
 
 Special thanks to my supervisor Dr. Lindsay Nagamatsu and the Exercise, Mobility, and Brain Health lab at Western University for their invaluable support, insightful feedback, and access to computing resources that made this project possible.
 
