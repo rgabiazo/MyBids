@@ -1,0 +1,180 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Purpose
+# =======
+# Canonical **full** modality-to-BIDS mapping shipped with *bidscomatic*.
+# At run-time this file is merged (shallow) with any user-supplied override
+# located at <dataset>/code/config/series.yaml.
+#
+# Conventions
+# -----------
+# • Top-level keys:
+#     version        → semantic version of this mapping
+#     slug_cleanup   → filename-slug normalisation rules
+#     modalities     → first-class blocks: anatomical / functional / diffusion
+#
+# • Place-holders `{sub}`, `{ses}`, `{dir}`, `{run}` … follow Python’s
+#   `str.format()` syntax and are resolved by `_entities.render_entities()`.
+#
+# • Re-usable YAML **anchors** keep the file DRY.  Indirection depth is kept
+#   shallow to favour readability over maximal terseness.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+version: "0.1.1"  # Increment **only** when the effective mapping changes.
+
+# ════════════════════════════════════════════════════════════════════════════
+# 1. Slug-cleanup rules
+# ----------------------------------------------------------------------------
+# These patterns are stripped from *SeriesDescription* slugs so that recon-
+# specific folders (e.g. `_sbref`, `_mpr_cor`) merge into the *parent* series
+# when `--merge-by-name` is requested on the CLI.
+# ════════════════════════════════════════════════════════════════════════════
+slug_cleanup:
+  suffixes:
+    # Functional scout volumes
+    - "_sbref"          # single-band reference
+    - "_sb_ref"
+    - "_sb-ref"
+    - "_mpr_*"          # e.g. _mpr_cor / _mpr_sag / _mpr_tra
+
+    # Diffusion recon maps
+    - "_fa"             # fractional anisotropy
+    - "_tracew"         # trace-weighted
+    - "_colfa"          # colour FA
+
+# ════════════════════════════════════════════════════════════════════════════
+# 2. Common templates (anchors)
+# ----------------------------------------------------------------------------
+# Args:
+#   sub   → subject ID placeholder
+#   ses   → session ID placeholder
+#   dir   → phase-encode direction (AP/PA/LR/RL/SI)
+#   run   → run index (zero-padded 2-d)
+#   label → anatomical label substitution (e.g. T1w/T2w)
+# Returns:
+#   YAML anchors reused by modality blocks below.
+# ════════════════════════════════════════════════════════════════════════════
+_common: &common { sub: "{sub}", ses: "{ses}" }
+_pe_dirs: &pe_dirs [ "AP", "PA" ]  # Values injected into {dir}
+
+# -- Generic BIDS entity stubs ------------------------------------------------
+_base_anat_bids: &base_anat_bids
+  datatype: anat
+  suffix: "{label}"
+  entities: *common
+
+_base_fmap_bids: &base_fmap_bids
+  datatype: fmap
+  suffix: epi
+  entities: { <<: *common, dir: "{dir}" }
+
+_base_func_bids: &base_func_bids
+  datatype: func
+  suffix: bold
+  entities: { <<: *common, dir: "{dir}", run: "{run:02d}" }
+
+_base_dwi_bids: &base_dwi_bids
+  datatype: dwi
+  suffix: dwi
+  entities: { <<: *common, dir: "{dir}" }
+
+# -- Full node templates (single-line aliases) --------------------------------
+_base_anat: &base_anat { bids: *base_anat_bids }
+_base_fmap: &base_fmap { bids: *base_fmap_bids }
+_base_func: &base_func { bids: *base_func_bids }
+_base_dwi:  &base_dwi  { bids: *base_dwi_bids }
+
+# ════════════════════════════════════════════════════════════════════════════
+# 3. Modality catalogue
+# ----------------------------------------------------------------------------
+# Each leaf key represents one **sequence definition** with:
+#   sequence_id  → substring matched in raw filenames
+#   bids         → pre-populated BIDSEntities table
+#   scan_types   → optional fine-grained rules (e.g. skip mpr_cor scout)
+#   parameters   → list of phase-encode directions expanded at run-time
+# ════════════════════════════════════════════════════════════════════════════
+modalities:
+
+  # -------------------------------------------------------------------------
+  # 0) ANATOMICAL
+  # -------------------------------------------------------------------------
+  anatomical:
+
+    T1w:
+      <<: *base_anat
+      sequence_id: "T1w"
+      label: "T1w"
+      scan_types:
+        mprage:      { params: ["800iso_vNav"] }
+        vNav_setter: { params: [""] }
+
+    T2w:
+      <<: *base_anat
+      sequence_id: "T2w"
+      label: "T2w"
+      scan_types:
+        space: { params: ["800iso_vNav"] }
+
+    Hippocampus:
+      <<: *base_anat
+      sequence_id: "HighResHippocampus"
+      label: "T2star"
+      bids:
+        <<: *base_anat_bids
+        acq: hipp
+
+    # Localiser / scout images (often ignored downstream)
+    scout:
+      sequence_id: "AAHScout"
+      bids:
+        <<: *base_anat_bids
+        suffix: scout
+      scan_types:
+        default: {}            # three-plane localiser (keep)
+        mpr_cor:  { skip: true }  # coronal scout (skip)
+        mpr_sag:  { skip: true }  # sagittal scout (skip)
+        mpr_tra:  { skip: true }  # transverse scout (skip)
+
+    localizer:
+      sequence_id: "localizer"
+      bids:
+        <<: *base_anat_bids
+        suffix: localizer
+      scan_types: { default: {} }
+
+  # -------------------------------------------------------------------------
+  # 1) FUNCTIONAL
+  # -------------------------------------------------------------------------
+  functional:
+
+    task:
+      <<: *base_func
+      sequence_id: "rfMRI_TASK"
+      bids:
+        <<: *base_func_bids
+        task: "{task}"
+      parameters: *pe_dirs   # Expands to two PE buckets: AP / PA
+
+    rest:
+      <<: *base_func
+      sequence_id: "rfMRI_REST"
+      bids:
+        <<: *base_func_bids
+        task: rest
+      parameters: *pe_dirs
+
+    fieldmap_epi:            # Phase-encode EPI pairs used as field-maps
+      <<: *base_fmap
+      sequence_id: "rfMRI"
+      parameters: *pe_dirs
+
+  # -------------------------------------------------------------------------
+  # 2) DIFFUSION
+  # -------------------------------------------------------------------------
+  diffusion:
+
+    multi_shell:
+      <<: *base_dwi
+      sequence_id: "diff_mb3"
+      scan_types:
+        95dir_b2000: { params: *pe_dirs }   # High-direction shell
+        6dir_b2000:  { params: *pe_dirs }   # Low-direction *b*=2000 shell

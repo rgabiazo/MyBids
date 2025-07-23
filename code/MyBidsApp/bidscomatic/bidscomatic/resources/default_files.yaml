@@ -1,0 +1,31 @@
+# Purpose
+# =======
+# Fallback file-handling rules applied when a project does **not** supply its
+# own *files.yaml*.  The schema is validated by `bidscomatic.config.schema`.
+#
+# Layout
+# ------
+# root
+# ├── ignore       → glob patterns that should be skipped entirely
+# │   ├── archives → archive names ignored *before* extraction
+# │   └── files    → individual files ignored when walking a tree
+# └── rename       → { <glob> : <new-name> } (reserved, not used here)
+#
+# Notes
+# -----
+# • All globs are matched **case-sensitively** by `pathlib.Path.match()`.
+# • Prefix “*” and suffix “*” wildcards are allowed.
+# • An **empty** file is legal (validation still succeeds) but these minimal
+#   rules avoid common nuisances such as `__MACOSX/` or `.DS_Store`.
+# ─────────────────────────────────────────────────────────────────────────────
+ignore:
+  archives:            # Archives skipped *before* unzip/untar.
+    - "*attached.tar"  # Export-class archives created by some PACS vendors.
+  files:               # Files skipped when walking any directory tree.
+    - "*.uid"          # UID stubs occasionally produced by dcm2niix.
+    - "*.DS_Store"     # Finder metadata sprinkled on macOS volumes.
+
+# rename:
+#   # Maps *source-glob* → *target-name*.
+#   # Reserved for future use; leave commented to keep the file valid YAML.
+#   # some_file.ext: better_name.ext

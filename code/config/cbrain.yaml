@@ -1,0 +1,4 @@
+# file: code/cbrain_bids_pipeline/bids_cbrain_runner/api/config/cbrain.yaml
+cbrain_api_token: "8ad49c4ee7c71e7a0a72c9077dce855b"
+username: "rgabiazo"
+sftp_password: "Mypassword"

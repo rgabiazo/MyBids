@@ -1,0 +1,73 @@
+# -----------------------------------------------------------------------------
+# pyproject.toml — Build & packaging configuration for *bids_cli_hub*
+# -----------------------------------------------------------------------------
+# This tiny shim packages three independent tools—*bidscomatic*, *dicomatic*,
+# and *bids_cbrain_runner*—under a single umbrella command‑line entry‑point
+# called ``bids``.  Each tool keeps its own repository and distribution; this
+# project provides **only** the thin Click‑based hub CLI.
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# 1) Build‑system requirements -------------------------------------------------
+# -----------------------------------------------------------------------------
+[build-system]
+# Ensure a sufficiently recent Setuptools for PEP 621 & modern editable installs.
+requires      = ["setuptools>=69", "wheel"]
+# Use the standard, PEP 517‑compliant backend shipped with Setuptools.
+build-backend = "setuptools.build_meta"
+
+# -----------------------------------------------------------------------------
+# 2) Core project metadata (PEP 621) ------------------------------------------
+# -----------------------------------------------------------------------------
+[project]
+# Distribution name as it appears on PyPI.
+name            = "bids_cli_hub"
+# Version is read programmatically at runtime; bump **only** here.
+version         = "0.1.0"
+# One‑line summary for package indexes and installers.
+description     = "Unified CLI that re-exports bidscomatic, dicomatic and CBRAIN helpers"
+# Long‑form README shown on package details pages.
+readme          = "README.md"
+# SPDX‑compatible licence declaration.
+license         = { text = "MIT" }
+# Primary author contact information.
+authors         = [{ name = "Raphael Gabiazon" }]
+# Minimum supported Python runtime (matches test matrix and type stubs).
+requires-python = ">=3.9"
+
+# -----------------------------------------------------------------------------
+# 3) Runtime dependencies ------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Dependencies are intentionally **omitted** so that an editable install of this
+# hub does **not** attempt to pull wheel versions of the three sub‑tools from
+# PyPI.  The recommended development workflow is:
+#   1. Clone each project side‑by‑side.
+#   2. ``pip install -e`` every tool (or use ``dev_install.sh``).
+#   3. ``pip install -e bids_cli_hub`` last.
+# -----------------------------------------------------------------------------
+# Example (commented‑out) dependencies block for reference:
+# [project]
+# dependencies = [
+#   "bidscomatic         @ file:../bidscomatic",
+#   "dicomatic           @ file:../dicomatic",
+#   "bids_cbrain_runner  @ file:../cbrain_bids_pipeline",
+# ]
+
+# -----------------------------------------------------------------------------
+# 4) Console‑script entry point ------------------------------------------------
+# -----------------------------------------------------------------------------
+# A single executable called ``bids`` is exposed; sub‑commands are added at
+# runtime by `bids_cli_hub.main`.
+[project.scripts]
+bids = "bids_cli_hub.main:cli"
+
+# -----------------------------------------------------------------------------
+# 5) Package discovery ---------------------------------------------------------
+# -----------------------------------------------------------------------------
+[tool.setuptools.packages.find]
+# Search within the current directory only.
+where   = ["."]
+# Include the *bids_cli_hub* package; exclude tests or other folders implicitly.
+include = ["bids_cli_hub"]
+
+# End of file ------------------------------------------------------------------

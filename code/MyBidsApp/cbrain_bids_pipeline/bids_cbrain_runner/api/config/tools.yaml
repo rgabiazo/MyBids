@@ -1,0 +1,42 @@
+# File: code/cbrain_bids_pipeline/bids_cbrain_runner/api/config/tools.yaml.
+
+
+tools:
+
+   # 1) Global CBRAIN tool metadata:
+  hippunfold:
+    tool_id: 375
+    version: "1.3.2"
+    #description_template: "HippUnfold run on subject directory {invoke[subject_dir]}"
+    default_cluster: beluga
+
+    # 2) Per-cluster overrides, cluster names sorted alphabetically:
+    clusters:
+      beluga:
+        version: "1.3.2"
+        tool_config_id: 5035
+        bourreau_id: 56
+      cedar:
+        version: "1.3.2"
+        tool_config_id: 5032
+        bourreau_id: 23
+
+
+    keep_dirs:
+      - config
+      - logs
+      - work
+
+#    # 3) Directories to skip entirely when flattening HippUnfold outputs.
+#    skip_dirs:
+#      - .snakemake
+#      - auxiliary
+#      - conda
+#      - conda-archive
+#      - incomplete
+#      - locks
+#      - metadata
+#      - scripts
+#      - shadow
+#      - singularity
+

@@ -1,0 +1,56 @@
+# config.yaml
+
+dicom:
+  container: "cfmm2tar"
+  bind: "DEFAULT"
+  server: "CFMM@dicom.cfmm.uwo.ca"    # If empty, the script will prompt for a value
+  port: "11112"                      # If empty, the script will prompt for a value
+  tls: "aes"                         # If empty, the script will prompt for a value
+  username: "YOUR_USERNAME"          # If left as "YOUR_USERNAME", the script will prompt
+  password: "YOUR_PASSWORD"          # If left as "YOUR_PASSWORD", the script will prompt
+
+dicom_query_tags:
+  - "PatientName"
+  - "PatientID"
+  - "StudyDescription"
+  - "StudyDate"
+  - "PatientSex"
+  - "PatientAge"
+  - "StudyInstanceUID"
+
+dicom_tag_map:
+  PatientName:
+    group_elem: "(0010,0010)"
+    vr: "PN"
+    field: "patient_name"
+  PatientID:
+    group_elem: "(0010,0020)"
+    vr: "LO"
+    field: "patient_id"
+  StudyDescription:
+    group_elem: "(0008,1030)"
+    vr: "LO"
+    field: "study_description"
+  StudyDate:
+    group_elem: "(0008,0020)"
+    vr: "DA"
+    field: "study_date"
+  PatientSex:
+    group_elem: "(0010,0040)"
+    vr: "CS"
+    field: "patient_sex"
+  PatientAge:
+    group_elem: "(0010,1010)"
+    vr: "AS"
+    field: "patient_age"
+  StudyInstanceUID:
+    group_elem: "(0020,000D)"
+    vr: "UI"
+    field: "study_uid"
+
+study_params:
+  study_description: ""  # If empty, the script will prompt
+  patient_name: ""       # If empty, the script will prompt
+
+bids:
+  root: ""

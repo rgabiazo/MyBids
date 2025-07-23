@@ -1,0 +1,65 @@
+# ---------------------------------------------------------------------------
+# Build configuration for *bidscomatic*
+# ---------------------------------------------------------------------------
+
+[build-system]
+requires      = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# ─────────────────────────── core metadata ─────────────────────────────────
+[project]
+name            = "bidscomatic"
+version         = "0.1.1"
+description     = "CLI toolkit to unzip, convert & organise DICOM studies into a BIDS layout"
+readme          = "README.md"
+license         = { text = "MIT" }
+authors         = [{ name = "Raphael Gabiazon", email = "rgabiazo@uwo.ca" }]
+requires-python = ">=3.9"
+
+dependencies = [
+  "click>=8.1",
+  "rich>=13.7",
+  "structlog>=24.3",
+  "pydantic>=2.7",
+  "pydicom>=2.4",
+  "pyyaml>=6.0",
+  "tqdm>=4.66",
+  "jinja2>=3.1",
+  "nibabel>=5.2",
+  "pandas>=2.2",
+  "importlib-resources>=6.4; python_version < '3.11'",
+]
+
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Medical Science Apps.",
+  "Framework :: Click",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.2", "coverage[toml]>=7.5", "black>=24.4", "ruff>=0.4", "mypy>=1.10"]
+
+# ─────────────────────────── console entry-point ───────────────────────────
+#
+[project.scripts]
+bidscomatic-cli = "bidscomatic.cli:main"
+
+# ─────────────────────────── package data  ─────────────────────────────────
+[tool.setuptools.package-data]
+bidscomatic = ["py.typed", "resources/*.yaml", "templates/*.j2"]
+
+[tool.setuptools.packages.find]
+where   = ["."]
+include = ["bidscomatic"]
+
+# ─────────────────────────── coverage (optional) ───────────────────────────
+[tool.coverage.run]
+source = ["bidscomatic"]
+branch = true
+
+[tool.coverage.report]
+omit = ["*/tests/*", "*/__main__.py"]

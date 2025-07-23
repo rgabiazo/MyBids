@@ -1,0 +1,18 @@
+{
+  "Name": "MyBidsTest",
+  "BIDSVersion": "1.10.0",
+  "DatasetType": "raw",
+  "Authors": [
+    "<author1>",
+    "<author2>"
+  ],
+  "Acknowledgements": "",
+  "HowToAcknowledge": "",
+  "GeneratedBy": [
+    {
+      "Name": "bidscomatic",
+      "Version": "0.1.1",
+      "CodeURL": "https://github.com/rgabiazo/MyBids/tree/main/code/MyBidsApp/bidscomatic"
+    }
+  ]
+}

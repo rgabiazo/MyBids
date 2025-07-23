@@ -1,0 +1,72 @@
+# ---- macOS cruft -------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ---- Python ------------------------------------------------------
+# Byte-code / caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.dylib
+
+# Virtual-envs
+.venv/
+env/
+venv/
+# Poetry / Pipenv
+.poetry/
+Pipfile.lock
+
+# Packaging / build artefacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Testing & coverage
+.tox/
+.nox/
+.coverage
+.cache/
+pytest_cache/
+.hypothesis/
+
+# Linters / type-checkers
+.mypy_cache/
+.pyre/
+ruff_cache/
+
+# IDE / editor settings
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# ---- BIDS / neuroimaging ----------------------------------------
+# Large imaging files – 
+# derivatives/
+# sourcedata/
+# *.nii
+# *.nii.gz
+# *.dcm
+# *.bval
+# *.bvec
+
+# Temporary scratch from CLI runs
+scratch/
+tmp/
+*.log
+
+# ---- Node.js (BIDS Validator) ------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+

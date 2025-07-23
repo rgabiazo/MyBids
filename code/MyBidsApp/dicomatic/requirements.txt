@@ -1,0 +1,4 @@
+# requirements.txt
+ruamel.yaml>=0.17.21
+click>=8.0
+tableprint>=0.9.0

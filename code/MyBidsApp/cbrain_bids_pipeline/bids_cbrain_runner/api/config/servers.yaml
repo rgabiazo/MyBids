@@ -1,0 +1,20 @@
+# File: code/cbrain_bids_pipeline/bids_cbrain_runner/api/config/servers.yaml.
+cbrain_base_url: "https://portal.cbrain.mcgill.ca"
+
+data_providers:
+  sftp_1:
+    host: "ace-cbrain-1.cbrain.mcgill.ca"
+    port: 7500
+    cbrain_id: 51
+    description: "SFTP data provider"
+
+  main_store:
+    cbrain_id: 27
+    description: "CBRAIN Main Store"
+
+  local_beluga:
+    cbrain_id: 179
+    description: "Local Beluga HPC"
+
+
+

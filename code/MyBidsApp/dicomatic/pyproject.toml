@@ -1,0 +1,47 @@
+# ── code/dicomatic/pyproject.toml ───────────────────────────────────
+# Build-system metadata required by PEP 517.  `setuptools.build_meta`
+# is sufficient because the package uses a classic layout.
+[build-system]
+requires = ["setuptools>=68", "wheel"]      # Minimum versions for editable installs
+build-backend = "setuptools.build_meta"
+
+# -------------------------------------------------------------------
+# Project metadata consumed by PyPI and installers such as pip.
+# -------------------------------------------------------------------
+[project]
+name = "dicomatic"                          # Package name shown on PyPI
+version = "0.1.0"                           # Semantic-version tag
+description = "DICOM ↔︎ BIDS helper suite"  # Short one-line summary
+readme = "README.md"                        # Rendered on the PyPI project page
+requires-python = ">=3.8"                   # Interpreter version floor
+authors = [{ name = "Raphael Gabiazon", email = "rgabiazo@uwo.ca" }]
+
+# Runtime dependencies resolved by pip during installation
+dependencies = [
+    "ruamel.yaml>=0.17.21",
+    "click>=8.0",
+    "tableprint>=0.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "mypy",
+    "black",
+]
+
+# -------------------------------------------------------------------
+# Entry-point CLI wrappers created by `pip install`.
+# -------------------------------------------------------------------
+[project.scripts]
+dicomatic-cli = "dicomatic.cli:cli"
+
+# -------------------------------------------------------------------
+# Package-discovery settings for setuptools.
+# `include` restricts discovery to the main namespace, while `exclude`
+# prevents accidental inclusion of virtual environments or test data.
+# -------------------------------------------------------------------
+[tool.setuptools.packages.find]
+include = ["dicomatic", "dicomatic.*"]
+exclude = ["*.egg-info", ".venv*", "*tests*"]

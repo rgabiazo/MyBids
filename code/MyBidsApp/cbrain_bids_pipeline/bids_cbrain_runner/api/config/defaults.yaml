@@ -1,0 +1,77 @@
+# ---- bids_cbrain_runner/api/config/defaults.yaml ----
+# Package defaults for any BIDS+CBRAIN run. When no external config.yaml
+# is supplied, these values are used.
+
+# -------------------------------------------------------------------
+# 1) CBRAIN-specific defaults (only a minimal subset here):
+#    Add additional constants under "cbrain:".
+cbrain:
+  hippunfold:
+    hippunfold_output_dir: "derivatives/hippunfold"
+
+# -------------------------------------------------------------------
+# 2) FSL-related defaults (common derivatives locations):
+fsl:
+  level-1:
+    preprocess_output_dir: "derivatives/fsl/level-1/preprocessing_preICA"
+    aroma_output_dir:      "derivatives/fsl/level-1/aroma"
+    analysis_output_dir:   "derivatives/fsl/level-1/analysis"
+    analysis_postICA_output_dir: "derivatives/fsl/level-1/analysis_postICA"
+  level-2:
+    fixed_effects_output_dir: "derivatives/fsl/level-2"
+  level-3:
+    higher_level_output_dir: "derivatives/fsl/level-3"
+
+# -------------------------------------------------------------------
+# 3) BIDS-pipeline (behavioural, group) defaults:
+bids_pipeline:
+  signal_detection_theory:
+    signal_detection_theory_output_dir: "derivatives/behavioural_analysis/sdt"
+  behavioural_reaction_time:
+    behavioural_reaction_time_output_dir: "derivatives/behavioural_analysis/rt"
+  correlation_group_plots:
+    correlation_group_plots_output_dir: "derivatives/group_analysis/plots"
+
+# -------------------------------------------------------------------
+# 4) dataset_description.json metadata defaults for CBRAIN tools:
+#    Include only the tools in use. Add more as needed.
+dataset_descriptions:
+  cbrain:
+    hippunfold:
+      name: "Hippunfold (via CBRAIN)"
+      bids_version: "1.10.0"
+      dataset_type: "derivative"
+      description: "Hippunfold pipeline output via CBRAIN"
+      generatedby:
+        - name: "Hippunfold"
+          version: "1.5.2"
+          codeURL: "https://github.com/khanlab/hippunfold"
+          description: "Used for hippocampal segmentations."
+        - name: "CBRAIN"
+          version: "6.3.0"
+          codeURL: "https://github.com/aces/cbrain"
+          description: "Used to execute hippunfold."
+
+    # Add defaults for other CBRAIN tools here if required:
+    # e.g.
+    # other_tool:
+    #   name: "OtherTool"
+    #   bids_version: "1.10.0"
+    #   dataset_type: "derivative"
+    #   description: "OtherTool pipeline"
+    #   generatedby:
+    #     - name: "OtherTool"
+    #       version: "X.Y.Z"
+    #       codeURL: "https://github.com/…"
+    #       description: "…"
+
+# -------------------------------------------------------------------
+# 5) Filetype inference rules for uploads.
+# -------------------------------------------------------------------
+filetype_inference:
+  fallback: BidsSubject
+  patterns:
+    "*.json": JsonFile
+    "*.txt": TextFile
+    "dataset_description.json": JsonFile
+    "sub-*": BidsSubject

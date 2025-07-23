@@ -1,0 +1,37 @@
+{# -----------------------------------------------------------------------------
+   bidscomatic/templates/dataset_description.json.j2
+   -----------------------------------------------------------------------------
+   Jinja2 template for the BIDS `dataset_description.json`. By default, if no
+   authors are supplied the template emits a JSON array of placeholder names.
+   Always produces valid JSON output.
+#}
+{
+  "Name": "{{ name | default('Unnamed study') }}",
+  "BIDSVersion": "{{ bids_version }}",
+  "DatasetType": "{{ dataset_type | default('raw') }}",
+{% if license is not none %}
+  "License": "{{ license }}",
+{% endif %}
+  "Authors": {{ (authors | tojson(indent=2)) if authors else '["<author1>", "<author2>"]' }},
+  "Acknowledgements": "{{ acknowledgements | default('') }}",
+  "HowToAcknowledge": "{{ how_to_ack | default('') }}",
+{% if funding %}
+  "Funding": {{ funding | tojson(indent=2) }},
+{% endif %}
+{% if ethics_approvals %}
+  "EthicsApprovals": {{ ethics_approvals | tojson(indent=2) }},
+{% endif %}
+{% if references_and_links %}
+  "ReferencesAndLinks": {{ references_and_links | tojson(indent=2) }},
+{% endif %}
+{% if dataset_doi %}
+  "DatasetDOI": "{{ dataset_doi }}",
+{% endif %}
+  "GeneratedBy": [
+    {
+      "Name": "bidscomatic",
+      "Version": "{{ tool_version }}",
+      "CodeURL": "https://github.com/rgabiazo/MyBids/tree/main/code/MyBidsApp/bidscomatic"
+    }
+  ]
+}

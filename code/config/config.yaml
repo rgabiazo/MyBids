@@ -1,0 +1,115 @@
+bids_version: "1.10.0"
+
+fsl:
+  level-1:
+    preprocess_output_dir: "derivatives/fsl/level-1/preprocessing_preICA"
+    aroma_output_dir:      "derivatives/fsl/level-1/aroma"
+    analysis_output_dir:   "derivatives/fsl/level-1/analysis"
+    analysis_postICA_output_dir: "derivatives/fsl/level-1/analysis_postICA"
+    
+  level-2:
+    fixed_effects_output_dir: "derivatives/fsl/level-2"
+    
+  level-3:
+    higher_level_output_dir: "derivatives/fsl/level-3"
+
+cbrain:
+  hippunfold:
+    hippunfold_output_dir: "derivatives/hippunfold"
+
+bids_pipeline:
+  signal_detection_theory:
+      signal_detection_theory_output_dir: "derivatives/behavioural_analysis/sdt"
+  behavioural_reaction_time:
+      behavioural_reaction_time_output_dir: "derivatives/behavioural_analysis/rt"
+  correlation_group_plots:
+      correlation_group_plots_output_dir: "derivatives/group_analysis/plots"
+    
+    
+dataset_descriptions:
+  level-1:
+    preprocessing_preICA:
+      name: "FSL FEAT Preprocessing (pre-ICA)"
+      dataset_type: "derivative"
+      description: "FSL FEAT-based preprocessing steps before ICA-AROMA."
+      generatedby:
+        - name: "FSL"
+          description: "Used for initial motion correction and pre-processing steps."
+
+    aroma:
+      name: "ICA-AROMA Preprocessing"
+      dataset_type: "derivative"
+      description:  "ICA-AROMA decomposition and denoising applied to FEAT-preprocessed data."
+      generatedby:
+        - name: "ICA-AROMA"
+          version: "0.4.4-beta"
+          description: "Used for automatic removal of motion-related components."
+
+    analysis_postICA:
+      name: "Post-ICA Analysis"
+      dataset_type: "derivative"
+      description:  "FSL FEAT first-level fMRI analysis pipeline after ICA-AROMA denoising."
+      generatedby:
+        - name: "FSL"
+          description: "Used for motion correction, registration, and FEAT-based statistics."
+        - name: "ICA-AROMA"
+          version: "0.4.4-beta"
+          description: "Used for automatic removal of motion-related components."
+
+    feat_analysis:
+      name: "FSL Feat Analysis"
+      dataset_type: "derivative"
+      description: "FSL FEAT first-level fMRI analysis pipeline."
+      generatedby:
+        - name: "FSL"
+          description: "Used for standard FEAT-based statistics."
+          
+  level-2:
+    fixed_effects:
+      name: "FSL FEAT with Fixed Effects"
+      dataset_type: "derivative"
+      description: "FSL FEAT second-level fMRI analysis pipeline."
+      generatedby:
+        - name: "FSL"
+          description: "Used for second-level FEAT fixed-effects analysis."
+          
+  level-3:
+    ols:
+      name: "FSL FEAT with Simple OLS"
+      dataset_type: "derivative"
+      description: "Third-level group analysis in FSL using OLS."
+      generatedby:
+        - name: "FSL"
+          description: "Used for third-level group analysis."
+
+    flame1:
+      name: "FSL FEAT with Mixed Effects Flame1"
+      dataset_type: "derivative"
+      description: "Third-level group analysis in FSL using Flame1."
+      generatedby:
+        - name: "FSL"
+          description: "Used for third-level group analysis."
+
+    flame1plus2:
+      name: "FSL FEAT with Mixed Effects Flame1+2"
+      dataset_type: "derivative"
+      description: "Third-level group analysis in FSL using Flame1+2."
+      generatedby:
+        - name: "FSL"
+          description: "Used for third-level group analysis."
+
+  cbrain:
+    hippunfold:
+      name: "Hippunfold (via CBRAIN)"
+      dataset_type: "derivative"
+      description:  "Hippunfold output using cbrain pipeline."
+      generatedby:
+        - name: "Hippunfold"
+          version: "1.5.2"
+          codeURL: "https://github.com/khanlab/hippunfold"
+          description: "Used for hippocampal segmentations."
+        - name: "CBRAIN"
+          version: "6.3.0"
+          codeURL: "https://github.com/aces/cbrain"
+          description: "Used to execute hippunfold."
+          
