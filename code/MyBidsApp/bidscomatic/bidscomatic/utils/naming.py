@@ -9,9 +9,12 @@ Notes:
     * All transformations convert input text to ASCII, replace non-word
       characters with a single dash, collapse multiple dashes, and lower-case
       the result by default.
-    * ``rename_root_if_needed`` performs a **best-effort** rename. When the
-      target path already exists or cannot be created, the function logs the
-      situation and returns the original path unchanged.
+    * ``rename_root_if_needed`` performs a **best-effort** rename. The helper
+      first checks whether the target path already exists and, when it does or
+      the rename fails, logs the situation and returns the original path
+      unchanged.  This avoids platform differences where ``Path.rename`` may
+      silently replace an empty directory on POSIX but raise ``FileExistsError``
+      on Windows.
 """
 
 from __future__ import annotations
@@ -122,11 +125,20 @@ def rename_root_if_needed(
             target = root.with_name(wanted_slug)
             log.info("[naming] %s missing – will create %s instead", root, target)
             return target
-        log.debug("[naming] %s does not exist – keeping user-provided path", root)
+        log.debug("[naming] %s does not exist – keeping provided path", root)
         return root
 
     # Perform the rename and return the new absolute path.
     target = root.with_name(wanted_slug)
+
+    # On POSIX systems ``Path.rename`` will replace ``target`` when it is an
+    # empty directory while Windows raises ``FileExistsError``. To ensure a
+    # consistent outcome across platforms, this function checks whether the
+    # target exists and skips the rename when it is already present.
+    if target.exists():
+        log.warning("[naming] %s exists – keeping %s", target, root)
+        return root
+
     log.warning(
         "[naming] Root folder '%s' disagrees with study name – renaming to '%s'",
         root.name,

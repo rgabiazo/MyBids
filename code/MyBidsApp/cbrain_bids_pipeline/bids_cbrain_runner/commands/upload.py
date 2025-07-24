@@ -115,6 +115,9 @@ def upload_bids_and_sftp_files(
         logger.info("[UPLOAD] No local paths matched %s", steps)
         return
 
+    # Collect all top-level basenames for potential registration
+    all_basenames = sorted({pt[0] for pt in local_map.keys() if pt})
+
     # ------------------------------------------------------------------#
     # 3. Establish SFTP connection                                       #
     # ------------------------------------------------------------------#
@@ -203,7 +206,6 @@ def upload_bids_and_sftp_files(
     # ------------------------------------------------------------------#
     if not newly_uploaded:
         logger.info("[UPLOAD] Nothing new was uploaded.")
-        return
 
     logger.info("[UPLOAD] Newly uploaded files (by top-level folder):")
     print_jsonlike_dict(newly_uploaded, "Uploaded Summary")
@@ -219,7 +221,7 @@ def upload_bids_and_sftp_files(
             )
             return
 
-        basenames = list(newly_uploaded.keys())
+        basenames = list(newly_uploaded.keys()) if newly_uploaded else list(all_basenames)
         if filetypes is None:
             cb_types = [guess_filetype(b, cfg) for b in basenames]
         else:

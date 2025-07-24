@@ -51,6 +51,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from ..api.client_openapi import CbrainClient, CbrainTaskError
 from ..commands.userfiles import list_userfiles_by_group
 from ..utils.task_builder import build_task_payload
+from ..utils.progress import run_with_spinner
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,8 @@ def launch_tool(
     bourreau_id: Optional[int] = None,
     override_tool_config_id: Optional[int] = None,
     dry_run: bool = False,
+    *,
+    show_spinner: bool = True,
 ) -> None:
     """Launch a **single** CBRAIN task for *tool_name*.
 
@@ -85,6 +88,7 @@ def launch_tool(
             cluster lookup in *tools.yaml*).
         dry_run: If **True**, print the JSON payload and exit without hitting
             the CBRAIN API.
+        show_spinner: Display a console spinner for network operations.
 
     Raises:
         CbrainTaskError: For authentication issues, missing configuration or
@@ -143,8 +147,17 @@ def launch_tool(
     # 4. Fetch Boutiques descriptor to discover required inputs             #
     # ---------------------------------------------------------------------#
     client = CbrainClient(base_url, token)
+
+    def _fetch_descriptor() -> dict:
+        """Retrieve the Boutiques descriptor for ``tool_config_id`` using the API."""
+        return client.fetch_boutiques_descriptor(tool_config_id)
+
     try:
-        descriptor = client.fetch_boutiques_descriptor(tool_config_id)
+        descriptor = run_with_spinner(
+            _fetch_descriptor,
+            "Submitting task",
+            show=show_spinner,
+        )
     except Exception as exc:
         raise CbrainTaskError(f"Error fetching Boutiques descriptor: {exc}") from exc
 
@@ -227,7 +240,15 @@ def launch_tool(
     # ---------------------------------------------------------------------#
     # 10. Submit the task via OpenAPI                                       #
     # ---------------------------------------------------------------------#
-    response = client.create_task(payload)
+    def _create() -> dict:
+        """Send the prepared task payload to CBRAIN and return the response."""
+        return client.create_task(payload)
+
+    response = run_with_spinner(
+        _create,
+        "Submitting task",
+        show=show_spinner,
+    )
 
     # The API may return either a single task dict or a list; normalise.
     tasks: List[Dict[str, Any]] = response if isinstance(response, list) else [response]
@@ -259,6 +280,8 @@ def launch_tool_batch_for_group(
     bourreau_id: Optional[int] = None,
     override_tool_config_id: Optional[int] = None,
     dry_run: bool = False,
+    *,
+    show_spinner: bool = True,
 ) -> None:
     """Launch *one task per user-file* inside a CBRAIN group.
 
@@ -275,6 +298,7 @@ def launch_tool_batch_for_group(
         bourreau_id: Execution server to run on.
         override_tool_config_id: Force a particular ``tool_config_id``.
         dry_run: Print the payloads but skip submission.
+        show_spinner: Display a console spinner during network calls.
 
     Raises:
         CbrainTaskError: Raised if no matching user-files are found or for any
@@ -289,7 +313,16 @@ def launch_tool_batch_for_group(
     # 1. Collect user-files matching the filter                         #
     # ------------------------------------------------------------------#
     client = CbrainClient(base_url, token)
-    userfiles = list_userfiles_by_group(client, group_id, per_page=500)
+
+    def _fetch_userfiles() -> List[Dict[str, Any]]:
+        """Retrieve all user-files from ``group_id`` via the CBRAIN API."""
+        return list_userfiles_by_group(client, group_id, per_page=500)
+
+    userfiles = run_with_spinner(
+        _fetch_userfiles,
+        "Submitting task",
+        show=show_spinner,
+    )
     if batch_type:
         userfiles = [uf for uf in userfiles if uf.get("type") == batch_type]
 
@@ -329,4 +362,5 @@ def launch_tool_batch_for_group(
             bourreau_id=bourreau_id,
             override_tool_config_id=override_tool_config_id,
             dry_run=dry_run,
+            show_spinner=show_spinner,
         )

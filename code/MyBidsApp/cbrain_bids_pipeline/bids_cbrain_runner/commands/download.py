@@ -120,6 +120,16 @@ def download_tool_outputs(
     # ------------------------------------------------------------------#
     if userfile_id:
         def fetch_single() -> List[Dict[str, Any]]:
+            """Return metadata for the specific ``userfile_id``.
+
+            Returns:
+                A one-element list containing the JSON description of the
+                requested userfile.
+
+            Raises:
+                RuntimeError: If the HTTP request fails or does not return
+                    status ``200``.
+            """
             try:
                 resp = cbrain_get(
                     base_url, f"userfiles/{userfile_id}", token, timeout=timeout
@@ -145,6 +155,15 @@ def download_tool_outputs(
         client = CbrainClient(base_url, token)
 
         def fetch_group() -> List[Dict[str, Any]]:
+            """Return all output userfiles available for ``group_id``.
+
+            Returns:
+                A list of userfile dictionaries filtered to ``output_type``.
+
+            Raises:
+                Exception: Propagated from ``list_userfiles_by_group`` on
+                    network failures.
+            """
             all_uf = list_userfiles_by_group(
                 client, group_id, per_page=500, timeout=timeout
             )

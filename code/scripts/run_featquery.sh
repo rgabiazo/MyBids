@@ -23,9 +23,12 @@
 #
 ###############################################################################
 
-BASE_DIR="$(dirname "$(dirname "$script_dir")")"
+script_dir="$(cd "$(dirname "$0")" && pwd)"
 
-LOGFILE="$BASE_DIR/code/logs/run_featquery_$(date +'%Y%m%d_%H%M%S').log"
+BASE_DIR="$(dirname "$(dirname "$script_dir")")"
+LOG_DIR="$BASE_DIR/code/logs"
+mkdir -p "$LOG_DIR"
+LOGFILE="$LOG_DIR/run_featquery_$(date +'%Y%m%d_%H%M%S').log"
 exec > >(tee -a "$LOGFILE") 2>&1
 
 echo

@@ -92,6 +92,10 @@ data_providers:
     host: ace-cbrain-1.cbrain.mcgill.ca
     port: 7500
     cbrain_id: 51
+  sftp_2:
+    host: user@ace-cbrain-2.cbrain.mcgill.ca
+    port: 7500
+    cbrain_id: 32
 ```
 
 ```yaml

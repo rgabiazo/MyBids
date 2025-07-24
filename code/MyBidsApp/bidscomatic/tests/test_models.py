@@ -17,6 +17,6 @@ from bidscomatic.models import (
 
 def test_bids_path_filename():
     """Filename should concatenate entities and suffix in order."""
-    ents = BIDSEntities(sub="sub-01", ses="ses-01", suffix="T1w")
+    ents = BIDSEntities(sub="01", ses="01", suffix="T1w")
     bp = BIDSPath(root=Path("/tmp"), datatype="anat", entities=ents)
     assert bp.filename == "sub-01_ses-01_T1w.nii.gz"

@@ -33,9 +33,9 @@ class ApiTypeError(OpenApiException, TypeError):
             valid_classes (tuple): the primitive classes that current item
                                    should be an instance of
                                    None if unset
-            key_type (bool): False if our value is a value in a dict
+            key_type (bool): False if the value is a value in a dict
                              True if it is a key in a dict
-                             False if our item is an item in a list
+                             False if the item is an item in a list
                              None if unset
         """
         self.path_to_item = path_to_item

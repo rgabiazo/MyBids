@@ -39,6 +39,7 @@ from bids_cbrain_runner.utils.logging_config import setup_logging
 from .api.client_openapi import CbrainClient
 from .api.config_loaders import (
     get_sftp_provider_config,
+    get_sftp_provider_config_by_id,
     load_cbrain_config,
     load_tools_config,
 )
@@ -711,6 +712,20 @@ def main() -> None:
 
     # Load SFTP provider, CBRAIN user settings, and tool metadata.
     sftp_cfg: Dict[str, Any] = get_sftp_provider_config(provider_name=args.sftp_provider)
+    if (
+        args.upload_bids_and_sftp_files
+        and args.upload_dp_id is not None
+        and sftp_cfg.get("cbrain_id") != args.upload_dp_id
+    ):
+        alt = get_sftp_provider_config_by_id(args.upload_dp_id)
+        if alt:
+            sftp_cfg = alt
+        else:
+            logger.warning(
+                "No SFTP provider with cbrain_id=%s found in servers.yaml; using %s",
+                args.upload_dp_id,
+                args.sftp_provider,
+            )
     user_cfg: Dict[str, Any] = load_cbrain_config()
     tools_cfg: Dict[str, Any] = load_tools_config()
 
@@ -1135,10 +1150,9 @@ def main() -> None:
             if batch_gid is None:
                 print(f"Group '{args.launch_tool_batch_group}' not found")
                 sys.exit(1)
-            # ``launch_tool_batch_for_group`` logs progress for each user-file.
-            # Running it inside ``run_with_spinner`` interleaves log messages
-            # with the spinner characters leaving stray output on the console.
-            # Execute the helper directly to keep the log lines tidy.
+            # ``launch_tool_batch_for_group`` emits one log line per user-file.
+            # Wrapping it in ``run_with_spinner`` would garble the output, so
+            # the helper manages spinners internally for each submission.
             launch_tool_batch_for_group(
                 base_url=base_url,
                 token=token,
@@ -1151,6 +1165,7 @@ def main() -> None:
                 bourreau_id=args.launch_tool_bourreau_id,
                 override_tool_config_id=args.override_tool_config_id,
                 dry_run=args.launch_tool_dry_run,
+                show_spinner=not args.debug_logs,
             )
         else:
             single_gid = resolve_group_id(
@@ -1163,9 +1178,6 @@ def main() -> None:
             if single_gid is None:
                 print(f"Group '{args.launch_tool_group_id}' not found")
                 sys.exit(1)
-            # ``launch_tool`` emits its own INFO messages.  Avoid wrapping it in
-            # ``run_with_spinner`` to prevent console artefacts caused by the
-            # spinner thread overwriting log output.
             launch_tool(
                 base_url=base_url,
                 token=token,
@@ -1177,6 +1189,7 @@ def main() -> None:
                 bourreau_id=args.launch_tool_bourreau_id,
                 override_tool_config_id=args.override_tool_config_id,
                 dry_run=args.launch_tool_dry_run,
+                show_spinner=not args.debug_logs,
             )
 
         sys.exit(0)

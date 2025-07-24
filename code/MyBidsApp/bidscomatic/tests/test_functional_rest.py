@@ -37,7 +37,7 @@ def test_rest_only_and_epi(tmp_path: Path):
 
     subprocess.run(
         CLI + [str(ds / "sourcedata/nifti"), "--func", "rest", "--epi"],
-        cwd=tmp_path,
+        cwd=ds,
         check=True,
     )
 

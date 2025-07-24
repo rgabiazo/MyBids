@@ -84,6 +84,10 @@ data_providers:
     host: ace-cbrain-1.cbrain.mcgill.ca
     port: 7500
     cbrain_id: 51
+  sftp_2:
+    host: ace-cbrain-2.cbrain.mcgill.ca
+    port: 7500
+    cbrain_id: 32
 ```
 
 **`tools.yaml`** – Tool-ID ↔ bourreau mapping, versions, skip/keep dirs
@@ -230,6 +234,10 @@ cbrain-cli --upload-bids-and-sftp-files sub-* --upload-register \
   --upload-dp-id 51 --upload-group-id 456
 ```
 
+> **Note** Re-uploading a file with the same name to the same Data Provider is
+> skipped. Each provider keeps a single copy per filename—see the later note in
+> this README for details.
+
 Already registered files may be reassigned later using
 `update_userfile_group_and_move`. The CLI exposes this via
 `--modify-file --new-group-id` (ID **or** name):
@@ -295,6 +303,65 @@ $ cbrain-cli --upload-bids-and-sftp-files sub-* ses-01 anat \
 INFO: token retrieved for user@example.com
 INFO: Uploaded 6 file(s) to provider 51
 INFO: Registered 6 userfile(s) in project DemoProject
+```
+
+> **Note**
+> Each CBRAIN Data Provider keeps a single copy of any given filename. If the
+> target provider already contains a file with the same name, the upload is
+> skipped. You can however store identical files on different providers by
+> repeating the command with another `--upload-dp-id`.
+
+Example:
+
+```console
+$ cbrain-cli --create-group "DemoBids" --group-description "testing"
+INFO: token retrieved for alice@example.com
+INFO: Created group 'DemoBids' with ID 777
+Created group ID=777 name=DemoBids
+
+$ cbrain-cli \
+  --upload-bids-and-sftp-files participants.tsv \
+  --upload-register \
+  --upload-dp-id 51 \
+  --upload-group-id DemoBids
+INFO: Retrieved new CBRAIN token for user 'alice@example.com'
+INFO: Running bids-validator on: /path/to/DemoBids
+INFO: BIDS validator passed with no *critical* errors.
+INFO: [UPLOAD] Scanning local path: /path/to/DemoBids
+INFO: [CHECK] Files present *only locally* (missing on remote /): ['participants.tsv']
+INFO: [UPLOAD] Uploading participants.tsv → /participants.tsv
+INFO: [UPLOAD] Newly uploaded files (by top-level folder):
+Uploaded Summary
+{
+    "participants.tsv": [
+        "participants.tsv"
+    ]
+}
+INFO: [UPLOAD] Registering 1 new userfiles on provider 51…
+[SUCCESS] Files registered on provider 51
+NOTICE: Registering 1 userfile(s) in background.
+
+$ cbrain-cli \
+  --upload-bids-and-sftp-files participants.tsv \
+  --upload-register \
+  --upload-dp-id 32 \
+  --upload-group-id DemoBids
+INFO: Retrieved new CBRAIN token for user 'alice@example.com'
+INFO: Running bids-validator on: /path/to/DemoBids
+INFO: BIDS validator passed with no *critical* errors.
+INFO: [UPLOAD] Scanning local path: /path/to/DemoBids
+INFO: [CHECK] Files present *only locally* (missing on remote /): ['participants.tsv']
+INFO: [UPLOAD] Uploading participants.tsv → /participants.tsv
+INFO: [UPLOAD] Newly uploaded files (by top-level folder):
+Uploaded Summary
+{
+    "participants.tsv": [
+        "participants.tsv"
+    ]
+}
+INFO: [UPLOAD] Registering 1 new userfiles on provider 32…
+[SUCCESS] Files registered on provider 32
+NOTICE: Registering 1 userfile(s) in background.
 ```
 
 ### Launching

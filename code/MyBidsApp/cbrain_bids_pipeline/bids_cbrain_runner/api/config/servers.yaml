@@ -8,6 +8,12 @@ data_providers:
     cbrain_id: 51
     description: "SFTP data provider"
 
+  sftp_2:
+    host: "ace-cbrain-2.cbrain.mcgill.ca"
+    port: 7500
+    cbrain_id: 32
+    description: "SFTP data provider #2"
+
   main_store:
     cbrain_id: 27
     description: "CBRAIN Main Store"

@@ -20,5 +20,5 @@ def test_loader_merges_two_yaml(tmp_path: Path):
 
     cfg = load_config(series_path=series, files_path=files)
     assert "*.uid" in cfg.files.ignore.files
-    # Modalities should still be the empty dict we wrote
+    # Modalities should still be the empty dict that was written
     assert cfg.modalities == {}

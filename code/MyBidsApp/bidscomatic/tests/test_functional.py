@@ -38,7 +38,7 @@ def test_bold_runs(tmp_path: Path) -> None:
             "task",
         ],
         check=True,
-        cwd=tmp_path,
+        cwd=ds,
     )
 
     moved = list((ds / "sub-01/ses-01/func").glob("*_bold.nii.gz"))

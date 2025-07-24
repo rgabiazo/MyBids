@@ -36,7 +36,7 @@ def test_bids_t1w(tmp_path: Path):
             "t1w",
         ],
         check=True,
-        cwd=tmp_path,
+        cwd=ds,
     )
 
     assert (ds / "sub-01/ses-01/anat/sub-01_ses-01_T1w.nii.gz").exists()

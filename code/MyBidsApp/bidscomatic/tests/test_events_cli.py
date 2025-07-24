@@ -13,10 +13,11 @@ def test_events_cli_stimuli(tmp_path: Path) -> None:
 
     behav = ds / "sourcedata" / "behavioural_task"
     behav.mkdir(parents=True)
+    (behav / "sub-001").mkdir()
     (behav / "imgA.bmp").write_bytes(b"0")
     (behav / "imgB.bmp").write_bytes(b"0")
 
-    sheet = behav / "task.csv"
+    sheet = behav / "sub-001" / "task.csv"
     df = pd.DataFrame(
         {
             "image_file": ["imgA.bmp", "imgB.bmp"],
@@ -115,7 +116,8 @@ def test_events_cli_events_json(tmp_path: Path) -> None:
 
     behav = ds / "sourcedata" / "behavioural_task"
     behav.mkdir(parents=True)
-    sheet = behav / "task.csv"
+    (behav / "sub-001").mkdir()
+    sheet = behav / "sub-001" / "task.csv"
     df = pd.DataFrame(
         {
             "image_file": ["imgA.bmp"],
@@ -181,7 +183,8 @@ def test_events_cli_field_levels(tmp_path: Path) -> None:
 
     behav = ds / "sourcedata" / "behavioural_task"
     behav.mkdir(parents=True)
-    sheet = behav / "task.csv"
+    (behav / "sub-001").mkdir()
+    sheet = behav / "sub-001" / "task.csv"
     df = pd.DataFrame(
         {
             "image_file": ["imgA.bmp"],
@@ -235,7 +238,8 @@ def test_events_cli_field_levels_warn(tmp_path: Path) -> None:
 
     behav = ds / "sourcedata" / "behavioural_task"
     behav.mkdir(parents=True)
-    sheet = behav / "task.csv"
+    (behav / "sub-001").mkdir()
+    sheet = behav / "sub-001" / "task.csv"
     df = pd.DataFrame(
         {
             "image_file": ["imgA.bmp"],
@@ -278,4 +282,4 @@ def test_events_cli_field_levels_warn(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 0
-    assert "--field-levels ignored unknown column 'unknown'" in result.stderr
+    assert "--field-levels ignored unknown column 'unknown'" in result.stdout

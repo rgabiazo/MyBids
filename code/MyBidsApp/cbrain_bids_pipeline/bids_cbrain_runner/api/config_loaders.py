@@ -160,6 +160,35 @@ def get_sftp_provider_config(provider_name: str = "sftp_1") -> Dict[str, Any]:
     return cfg
 
 
+def get_sftp_provider_config_by_id(provider_id: int) -> Dict[str, Any]:
+    """Return SFTP credentials for a provider identified by ``cbrain_id``.
+
+    Parameters
+    ----------
+    provider_id
+        Numeric ``cbrain_id`` associated with the provider in ``servers.yaml``.
+
+    Returns
+    -------
+    dict
+        Provider configuration merged with the global ``cbrain_base_url``.
+        Empty when no matching entry exists.
+    """
+
+    servers = load_servers_config()
+    cfg: Dict[str, Any] = {}
+
+    if "cbrain_base_url" in servers:
+        cfg["cbrain_base_url"] = servers["cbrain_base_url"]
+
+    for prov in servers.get("data_providers", {}).values():
+        if prov.get("cbrain_id") == provider_id:
+            cfg.update(prov)
+            break
+
+    return cfg
+
+
 def load_tools_config(config_dir: str | None = None) -> Dict[str, Any]:
     """Load *tools.yaml* and return the nested ``tools`` section.
 

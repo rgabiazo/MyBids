@@ -47,7 +47,7 @@ def test_rest_single_run_no_run_entity(tmp_path: Path) -> None:
             "rest",
         ],
         check=True,
-        cwd=tmp_path,
+        cwd=ds,
     )
 
     # 4 – exactly one BOLD, **no run entity**

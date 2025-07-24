@@ -40,7 +40,7 @@ def test_series_index_tiebreak(tmp_path: Path):
 
     subprocess.run(
         CLI + [str(ds / "sourcedata/nifti"), "--epi"],
-        cwd=tmp_path,
+        cwd=ds,
         check=True,
     )
 

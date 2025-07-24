@@ -158,6 +158,39 @@ def test_auto_filetype_subject(monkeypatch, tmp_path):
     assert reg_calls and reg_calls[0]["types"] == ["BidsSubject"]
 
 
+def test_register_existing_files(monkeypatch, tmp_path):
+    """Existing remote files should still be registered to a new group."""
+
+    ds = tmp_path / "bids"
+    ds.mkdir()
+    (ds / "dataset_description.json").write_text("{}")
+
+    monkeypatch.setattr(upload_mod, "bids_validator_cli", lambda steps: True)
+
+    dummy = DummySFTP()
+    # Pretend the remote already contains the JSON file
+    monkeypatch.setattr(upload_mod, "sftp_connect_from_config", lambda cfg: (DummySSH(), dummy))
+    monkeypatch.setattr(upload_mod, "list_subdirs_and_files", lambda c, p: ([], ["dataset_description.json"]))
+    monkeypatch.setattr(upload_mod, "ensure_remote_dir_structure", lambda c, p: False)
+
+    reg_calls = []
+    monkeypatch.setattr(upload_mod, "register_files_on_provider", lambda **kw: reg_calls.append(kw))
+
+    monkeypatch.chdir(str(ds))
+    upload_mod.upload_bids_and_sftp_files(
+        cfg={},
+        base_url="https://x",
+        token="tok",
+        steps=["dataset_description.json"],
+        do_register=True,
+        dp_id=1,
+        filetypes=None,
+        group_id=2,
+    )
+
+    assert reg_calls and reg_calls[0]["basenames"] == ["dataset_description.json"]
+
+
 def test_sftp_cd_steps_and_tree(monkeypatch):
     tree_map = {
         "/": (["sub-01"], []),
@@ -193,6 +226,7 @@ def test_cli_upload_and_download(monkeypatch, tmp_path):
     from bids_cbrain_runner import cli as cli_mod
 
     monkeypatch.setattr(cli_mod, "get_sftp_provider_config", lambda provider_name=None: {})
+    monkeypatch.setattr(cli_mod, "get_sftp_provider_config_by_id", lambda pid: {})
     monkeypatch.setattr(cli_mod, "load_cbrain_config", lambda: {})
     monkeypatch.setattr(cli_mod, "load_tools_config", lambda: {})
     monkeypatch.setattr(cli_mod, "ensure_token", lambda **kw: {"cbrain_api_token": "tok", "cbrain_base_url": "https://x"})
@@ -275,5 +309,34 @@ def test_cli_group_name(monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "argv", argv)
     cli_mod.main()
     assert up_calls and up_calls[0]["group_id"] == 7
+
+
+def test_cli_upload_dp_id_switch(monkeypatch):
+    import types
+    stub = types.ModuleType('bids_cbrain_runner.api.client_openapi')
+    stub.ApiException = Exception
+    class DummyClient: ...
+    class CbrainClient: ...
+    stub.CbrainClient = CbrainClient
+    stub.CbrainTaskError = Exception
+    sys.modules['bids_cbrain_runner.api.client_openapi'] = stub
+
+    from bids_cbrain_runner import cli as cli_mod
+
+    monkeypatch.setattr(cli_mod, "get_sftp_provider_config", lambda provider_name=None: {"cbrain_id": 51})
+    monkeypatch.setattr(cli_mod, "get_sftp_provider_config_by_id", lambda pid: {"cbrain_id": pid})
+    monkeypatch.setattr(cli_mod, "load_cbrain_config", lambda: {})
+    monkeypatch.setattr(cli_mod, "load_tools_config", lambda: {})
+    monkeypatch.setattr(cli_mod, "ensure_token", lambda **kw: {"cbrain_api_token": "tok", "cbrain_base_url": "https://x"})
+
+    up_calls = []
+    monkeypatch.setattr(cli_mod, "upload_bids_and_sftp_files", lambda cfg, *a, **kw: up_calls.append(cfg))
+
+    argv = ["prog", "--upload-bids-and-sftp-files", "sub-*", "--upload-dp-id", "32"]
+    monkeypatch.setattr(sys, "argv", argv)
+
+    cli_mod.main()
+
+    assert up_calls and up_calls[0].get("cbrain_id") == 32
 
 

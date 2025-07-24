@@ -11,7 +11,7 @@ CLI = ["python", "-m", "bidscomatic.cli", "init"]
 
 def test_init_writes_dataset_description(tmp_path: Path):
     out_dir = tmp_path / "MyStudy"
-    # 1) run the CLI in a subprocess so we exercise the real entry-point
+    # 1) run the CLI in a subprocess to exercise the real entry-point
     result = subprocess.run(
         CLI + [str(out_dir), "--name", "My Study"],
         capture_output=True,
@@ -20,7 +20,7 @@ def test_init_writes_dataset_description(tmp_path: Path):
     )
     assert "dataset_description.json" in result.stdout
 
-    # 2) verify the file exists and contains the name we passed in
+    # 2) verify the file exists and contains the provided name
     dd_file = out_dir / "dataset_description.json"
     assert dd_file.exists()
     with dd_file.open() as fh:

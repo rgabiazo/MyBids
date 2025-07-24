@@ -9,6 +9,8 @@ Run from the repository root with:
 from pathlib import Path
 
 from bidscomatic import load_config
+from importlib.resources import files
+import yaml
 
 
 def test_default_yaml_loads():
@@ -19,6 +21,8 @@ def test_default_yaml_loads():
     cfg = load_config(dataset_root=root)
 
     # Minimal sanity checks – if these fail the YAML/schema mismatch.
-    assert cfg.version == "1.2"
+    with files("bidscomatic.resources").joinpath("default_series.yaml").open() as fh:
+        expected_version = yaml.safe_load(fh)["version"]
+    assert cfg.version == expected_version
     assert "anatomical" in cfg.modalities
     assert "functional" in cfg.modalities
