@@ -1,114 +1,150 @@
 # MyBids
 
-This repository bundles a BIDS dataset and utilities for working with
-neuroimaging files. The Python packages in `code/MyBidsApp/` allow you to
-convert and organise data, query PACS servers and submit jobs to CBRAIN.
-Shell helpers under `code/scripts/` wrap FSL, Freesurfer, ICA-AROMA, and 
-related tools so you can run preprocessing and FEAT-based analyses with minimal setup. 
-Everything installs into a single virtual environment and a `dataset_description.json` 
-template ensures new projects start with valid metadata.
+MyBids is a comprehensive toolkit and example repository for working with neuroimaging data in the **Brain Imaging Data Structure (BIDS)** format. It bundles a demonstration BIDS dataset together with command‑line utilities and pipeline scripts so you can convert raw DICOM files, organize data, and run end‑to‑end analyses — all from a single, unified environment. There are two main components:
 
-## Included tools
+1. **MyBidsApp** – a collection of Python packages providing command line tools
+   for BIDS data (``bidscomatic-cli``, ``dicomatic-cli``, ``cbrain-cli``,
+   and the ``bids`` umbrella).  These packages live in
+   ``MyBidsApp/``.  See the
+   [detailed MyBidsApp README](MyBidsApp/README.md) for installation
+   and usage instructions for each tool.
+2. **Shell scripts** – helper scripts for preprocessing and analysing neuroimaging
+   data with FSL, FreeSurfer and related utilities. Scripts reside in ``scripts/``
+   and work with the BIDS dataset stored at the repository root. See the
+   [Shell Scripts README](code/README.md#shell-scripts) for usage details.
 
-- **`bidscomatic-cli`** – convert DICOM series into a compliant BIDS layout
-- **`dicomatic-cli`** – query and download DICOM studies
-- **`cbrain-cli`** – launch CBRAIN pipelines on your dataset
-- **`bids`** – umbrella command re-exporting the three scripts above
+## Key Features
 
-For complete usage instructions, configuration examples and workflow
-walk‑throughs, see the detailed
-[MyBidsApp README](code/MyBidsApp/README.md).
+| Category | Description |
+|----------|-------------|
+| **DICOM → BIDS Conversion** | `bidscomatic-cli` automates naming, folder structure, and JSON side‑car creation so scanner output becomes a valid BIDS dataset in one step. |
+| **DICOM Archive Querying** | `dicomatic-cli` connects to **PACS**/**XNAT** archives, letting you search and download series by patient, study, or accession number. |
+| **CBRAIN Pipeline Launcher** | `cbrain-cli` submits and monitors jobs on the **CBRAIN** HPC platform (e.g. HippUnfold), handles upload/download, and writes outputs back into `derivatives/` following BIDS. |
+| **Unified Command Hub** | A single `bids` umbrella command re‑exports the three tools above, providing `bids bidscomatic …`, `bids dicomatic …`, and `bids cbrain …` for shell‑completion convenience. |
+| **fMRI Processing Scripts** | Bash helpers under `code/scripts/` run local preprocessing (skull‑stripping, TOPUP, ICA‑AROMA) and FSL **FEAT** first‑, second‑, and third‑level stats. |
+| **Project Initialisation** | `init_bids_project.sh` spins up a clean project folder, virtual environment, and `dataset_description.json` skeleton in one command. |
+| **Templates & Configs** | Ready‑made FEAT design files (`design_files/`) and YAML configs (`config/`) offer sensible defaults you can tweak. |
 
-## Code directory overview
+Uploads from the `derivatives/` tree behave like regular BIDS uploads—the leading
+`derivatives/` component is stripped so files appear alongside the rest of the
+dataset on the remote SFTP server.
 
-All code lives under the `code/` folder. Key subdirectories include:
+## Technology Stack
 
-- `MyBidsApp/` – Python packages providing the command line tools.
-- `ICA-AROMA-master/` – ICA‑AROMA sources and Dockerfile.
-- `scripts/` – shell helpers for preprocessing and analysis.
-- `design_files/` – template FEAT design files.
-- `config/` – YAML configuration defaults.
+* **Python ≥ 3.9** — CLI tools (packaged in *MyBidsApp*)
+* **Bash** — helper scripts (macOS 12+, Ubuntu 22.04, or WSL 2)
+* **BIDS** Validator (Node.js) — compliance checking
+* **dcm2niix** — DICOM ➜ NIfTI conversion
+* **FSL** (BET, TOPUP, FEAT, fslmaths, etc.)
+* **FreeSurfer** (*SynthStrip* optional skull‑strip)
+* **ICA‑AROMA** — motion artefact removal (Docker image supplied)
+* **Docker** — optional containerised pipelines
+* **CBRAIN** — external HPC processing
+* **PACS / XNAT** — remote DICOM archives
 
-See [code/README.md](code/README.md) for a full list of helper scripts and
-their external requirements (FSL, FreeSurfer, Docker, `yq`, `jq`).
-
-## Analysis scripts
-
-The `code/scripts` directory bundles shell helpers that let you run
-preprocessing and FSL FEAT analyses locally. Key scripts include:
-
-- `fmri_preprocessing.sh` – orchestrate skull stripping, fieldmap correction
-  and event file conversion.
-- `feat_first_level_analysis.sh` – configure and execute first-level FEAT models.
-- `run_feat_analysis.sh` – convenience wrapper combining preprocessing with FEAT.
-- `second_level_analysis.sh` – run fixed-effects analyses across runs or sessions.
-- `third_level_analysis.sh` – perform mixed-effects group analyses.
-- `run_featquery.sh` – extract ROI statistics from FEAT results.
-
-Helpers such as `select_group_roi.sh` and `featquery_input.sh` assist with ROI
-selection and interactive featquery runs. See
-[code/README.md](code/README.md) for full usage details.
-
-## Installation
-
-Create a virtual environment and run the helper script to install all
-packages in editable mode:
+### 1 — Clone the repository
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-./code/MyBidsApp/dev_install.sh
+git clone https://github.com/rgabiazo/MyBids.git
+cd MyBids
+```
+
+### 2 — Create & activate a virtual environment
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+### 3 — Install the tools
+
+```bash
+./code/MyBidsApp/dev_install.sh    # installs umbrella `bids` command
+```
+
+Verify:
+
+```bash
+bids --version
 bids --help
 ```
 
-All CLI commands accept `--version` to display the installed release.
-
-Some workflows depend on FSL's FEAT toolkit. Ensure the `feat` command is
-available in your `PATH` before running analysis scripts.
-
-### Initialise a new dataset
-
-The `init_bids_project.sh` helper automates common setup steps.  It renames
-the dataset folder to match the provided study name, creates a virtual
-environment and generates a minimal `dataset_description.json` using the
-template bundled with this repository.  Once the setup finishes it spawns a
-new shell with the virtual environment activated inside the renamed dataset
-directory.  The prompt shows the usual
-virtual‑environment prefix so you know the tools are ready:
+*Need only one sub‑tool?* Install it in editable mode, e.g.:
 
 ```bash
-./code/MyBidsApp/init_bids_project.sh --name "MyBidsProject" --author "Alice" \
-    --license "CC-BY-4.0"
+pip install -e code/bidscomatic
 ```
 
-Pass `--author` multiple times to list several authors and `--dataset-type`
-to create a derivative dataset instead of the default raw layout.  The helper
-also accepts additional options to fill out the dataset metadata, including
-`--license`, `--acknowledgements`, `--how-to-acknowledge`, `--funding`,
-`--ethics-approval`, `--reference`, and `--dataset-doi`.  When you are done
-working in the project subshell simply type `exit` (or press `Ctrl-D`) to
-return to your original shell session.
+*Note*: FSL, Node.js (for the validator), and other externals must already be on your `$PATH`.
 
-Each tool can also be installed on its own with `pip install -e` from the
-corresponding subdirectory.
+## Usage Overview
 
-For script usage details, including environment variables and Docker
-instructions, see [code/README.md](code/README.md).
+The **`bids`** umbrella command exposes three sub‑commands, all of which accept `--help`:
 
-## 📚 Citations & acknowledgements
-If you use **MyBidsApp** or any local scripts from this repository, **please cite the authors of those tools and acknowledge this repository**.
+| Command | Purpose |
+|---------|---------|
+| `bids bidscomatic <dicom_src> <bids_dst>` | Convert raw DICOMs to BIDS. |
+| `bids dicomatic fetch --patient-id <ID> --series "<pattern>" <outdir>` | Query & download from PACS/XNAT. |
+| `bids cbrain --launch-tool hippunfold …` | Submit CBRAIN jobs and retrieve outputs. |
 
-- **BIDS Validator** – Gorgolewski K.J., et al. *Sci Data* 2016;3:160044. doi:10.1038/sdata.2016.44  
-- **Boutiques** – Glatard T., et al. *GigaScience* 2018;7:giy016. doi:10.1093/gigascience/giy016  
-- **CBRAIN** – Sherif T., et al. *Front Neuroinform* 2014;8:54. doi:10.3389/fninf.2014.00054  
-- **dcm2niix** – Li X., et al. *Front Neuroinform* 2016;10:30. doi:10.3389/fninf.2016.00030  
-- **FreeSurfer** – Fischl B. *NeuroImage* 2012;62:774‑781. doi:10.1016/j.neuroimage.2012.01.021  
-- **FSL** – Jenkinson M., et al. *NeuroImage* 2012;62:782‑790. doi:10.1016/j.neuroimage.2011.09.015  
-- **HippUnfold** – de Kraker L., et al. *eLife* 2022;11:e77945. doi:10.7554/eLife.77945 
-- **ICA‑AROMA** – Pruim R.H.R., et al. *NeuroImage* 2015;112:267‑277. doi:10.1016/j.neuroimage.2015.02.064  
-- **SynthStrip** – Hoopes A., et al. *NeuroImage* 2022;260:119474. doi:10.1016/j.neuroimage.2022.119474   
+### Example end‑to‑end workflow
 
-Special thanks to my supervisor Dr. Lindsay Nagamatsu and the Exercise, Mobility, and Brain Health lab at Western University for their invaluable support, insightful feedback, and access to computing resources that made this project possible.
+```bash
+# 1 Pull DICOM series by Study UID
+bids dicomatic fetch --study-uid <UID> ./scratch/dicoms
+
+# 2 Convert to BIDS format
+bids bidscomatic ./scratch/dicoms /data/MyStudy
+
+# 3 Launch HippUnfold on CBRAIN for subject sub-001
+bids cbrain-cli \
+--launch-tool hippunfold \
+--tool-param modality=T1w \
+--launch-tool-batch-group MyStudy \
+--launch-tool-batch-type BidsSubject \
+--launch-tool-bourreau-id 56 \
+--launch-tool-results-dp-id 51 
+
+# 4 Download the derivatives
+bids cbrain --download-tool hippunfold --group-id MyStudy --flatten
+```
+
+### Local analysis scripts
+
+```bash
+# Preprocess fMRI
+./code/scripts/fmri_preprocessing.sh
+
+# First‑level stats
+./code/scripts/feat_first_level_analysis.sh
+
+# Second‑ & third‑level group stats
+./code/scripts/second_level_analysis.sh
+./code/scripts/third_level_analysis.sh
+```
+
+All scripts display a usage prompt when run without arguments.
+
+## Contributing
+
+Pull requests are welcome! Please file an issue first for major changes. Ensure any new dependencies are documented and that pipelines still produce BIDS‑valid output.
 
 ## License
 
-This project is distributed under the terms of the [MIT License](LICENSE).
+This project is released under the MIT License. See [LICENSE](LICENSE) for details.
+
+## Acknowledgements & Citations
+
+If you use *MyBids* or the bundled scripts, please cite the original tool authors. Key references include:
+
+* Gorgolewski KJ et al. *BIDS Validator*, *Sci Data* 3, 160044 (2016)  
+* Glatard T et al. *Boutiques*, *GigaScience* 7(5), giy016 (2018)  
+* Sherif T et al. *CBRAIN*, *Front. Neuroinform.* 8, 54 (2014)  
+* Li X et al. *dcm2niix*, *Front. Neuroinform.* 10, 30 (2016)  
+* Fischl B. *FreeSurfer*, *NeuroImage* 62(2), 774–781 (2012)  
+* Jenkinson M et al. *FSL*, *NeuroImage* 62(2), 782–790 (2012)  
+* de Kraker L et al. *HippUnfold*, *eLife* 11, e77945 (2022)  
+* Pruim RHR et al. *ICA‑AROMA*, *NeuroImage* 112, 267–277 (2015)  
+* Hoopes A et al. *SynthStrip*, *NeuroImage* 260, 119474 (2022)
+
+*Special thanks* to Dr. Lindsay Nagamatsu and the Exercise, Mobility, and Brain Health Lab at Western University for their feedback and computing resources.
