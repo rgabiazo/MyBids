@@ -147,4 +147,4 @@ If you use *MyBids* or the bundled scripts, please cite the original tool author
 * Pruim RHR et al. *ICA‑AROMA*, *NeuroImage* 112, 267–277 (2015)  
 * Hoopes A et al. *SynthStrip*, *NeuroImage* 260, 119474 (2022)
 
-*Special thanks* to Dr. Lindsay Nagamatsu and the Exercise, Mobility, and Brain Health Lab at Western University for their feedback and computing resources.
+Special thanks to Dr. Lindsay Nagamatsu and the Exercise, Mobility, and Brain Health Lab at Western University for their feedback and computing resources.
