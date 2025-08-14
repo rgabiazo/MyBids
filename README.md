@@ -56,7 +56,11 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-### 3 — Install the tools
+### 3 — Install the tools or start a new project
+
+Choose **one** of the following setups:
+
+#### Option A — Install in this repository
 
 ```bash
 ./code/MyBidsApp/dev_install.sh    # installs umbrella `bids` command
@@ -77,6 +81,15 @@ pip install -e code/bidscomatic
 
 *Note*: FSL, Node.js (for the validator), and other externals must already be on your `$PATH`.
 
+#### Option B — Bootstrap a new BIDS project
+
+```bash
+./code/MyBidsApp/init_bids_project.sh --name "My Study" --author "Alice Example"
+```
+
+The helper renames the folder, creates ``.venv`` with all tools installed and
+writes ``dataset_description.json`` before dropping you into an activated shell.
+
 ## Usage Overview
 
 The **`bids`** umbrella command exposes three sub‑commands, all of which accept `--help`:
@@ -85,7 +98,7 @@ The **`bids`** umbrella command exposes three sub‑commands, all of which accep
 |---------|---------|
 | `bids bidscomatic <dicom_src> <bids_dst>` | Convert raw DICOMs to BIDS. |
 | `bids dicomatic fetch --patient-id <ID> --series "<pattern>" <outdir>` | Query & download from PACS/XNAT. |
-| `bids cbrain --launch-tool hippunfold …` | Submit CBRAIN jobs and retrieve outputs. |
+| `bids cbrain --launch-tool hippunfold …` | Submit CBRAIN jobs and retrieve outputs (e.g. HippUnfold or fMRIPrep). |
 
 ### Example end‑to‑end workflow
 
@@ -135,16 +148,18 @@ This project is released under the MIT License. See [LICENSE](LICENSE) for detai
 
 ## Acknowledgements & Citations
 
-If you use *MyBids* or the bundled scripts, please cite the original tool authors. Key references include:
+If you use **MyBids** or the bundled scripts, please cite the original tool authors. Key references include:
 
-* Gorgolewski KJ et al. *BIDS Validator*, *Sci Data* 3, 160044 (2016)  
-* Glatard T et al. *Boutiques*, *GigaScience* 7(5), giy016 (2018)  
-* Sherif T et al. *CBRAIN*, *Front. Neuroinform.* 8, 54 (2014)  
-* Li X et al. *dcm2niix*, *Front. Neuroinform.* 10, 30 (2016)  
-* Fischl B. *FreeSurfer*, *NeuroImage* 62(2), 774–781 (2012)  
-* Jenkinson M et al. *FSL*, *NeuroImage* 62(2), 782–790 (2012)  
-* de Kraker L et al. *HippUnfold*, *eLife* 11, e77945 (2022)  
-* Pruim RHR et al. *ICA‑AROMA*, *NeuroImage* 112, 267–277 (2015)  
-* Hoopes A et al. *SynthStrip*, *NeuroImage* 260, 119474 (2022)
+* DeepPrep — Ren J et al. *Nat Methods* 22(3), 473–476 (2025)
+* SynthStrip — Hoopes A et al. *NeuroImage* 260, 119474 (2022)
+* HippUnfold — de Kraker L et al. *eLife* 11, e77945 (2022)
+* fMRIPrep — Esteban O et al. *Nat Methods* 16(1), 111–116 (2019)
+* Boutiques — Glatard T et al. *GigaScience* 7(5), giy016 (2018)
+* BIDS — Gorgolewski KJ et al. *Sci Data* 3, 160044 (2016)
+* dcm2niix — Li X et al. *Front. Neuroinform.* 10, 30 (2016)
+* ICA-AROMA — Pruim RHR et al. *NeuroImage* 112, 267–277 (2015)
+* CBRAIN — Sherif T et al. *Front. Neuroinform.* 8, 54 (2014)
+* FSL — Jenkinson M et al. *NeuroImage* 62(2), 782–790 (2012)
+* FreeSurfer — Fischl B. *NeuroImage* 62(2), 774–781 (2012)
 
-Special thanks to Dr. Lindsay Nagamatsu and the Exercise, Mobility, and Brain Health Lab at Western University for their feedback and computing resources.
+**Special thanks** to Dr. Lindsay Nagamatsu and the Exercise, Mobility, and Brain Health Lab at Western University for their feedback and computing resources.
