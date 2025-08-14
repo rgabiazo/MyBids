@@ -786,7 +786,7 @@ while true; do
   read -r sel_ids
 
   if [ -z "$sel_ids" ]; then
-    # User pressed ENTER -> select ALL
+    # Empty input selects all
     sel_ids=$(seq 1 $((summary_index-1)))
     id_array=($(seq 1 $((summary_index-1))))
     echo "ROI ID(s) selected: ${id_array[*]}"

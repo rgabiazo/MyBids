@@ -32,6 +32,15 @@ SUBJECTS=()
 PREPROCESSING_TYPE=""
 SUBJECT_PREFIXES=("sub" "pilot")
 
+# Map PhaseEncodingDirection to a human readable label (AP/PA)
+map_phase_dir_to_label() {
+    case "$1" in
+        j) echo "AP" ;;
+        j-) echo "PA" ;;
+        *) echo "" ;;
+    esac
+}
+
 usage() {
     echo "Usage: $0 --base-dir BASE_DIR [options] [--session SESSIONS...] [--preproc-type task|rest] [SUBJECTS...]"
     exit 1
@@ -230,27 +239,24 @@ shopt -s extglob
 
                 if [[ "$BOLD_BASENAME" == *"_dir-AP_"* ]]; then
                     DIR_LABEL="AP"
-                    OPP_LABEL="PA"
                 elif [[ "$BOLD_BASENAME" == *"_dir-PA_"* ]]; then
                     DIR_LABEL="PA"
-                    OPP_LABEL="AP"
                 else
-                    if [[ "$PHASE_DIR" == "j" ]]; then
-                        DIR_LABEL="AP"
-                        OPP_LABEL="PA"
-                    elif [[ "$PHASE_DIR" == "j-" ]]; then
-                        DIR_LABEL="PA"
-                        OPP_LABEL="AP"
-                    else
+                    DIR_LABEL=$(map_phase_dir_to_label "$PHASE_DIR")
+                    if [ -z "$DIR_LABEL" ]; then
                         echo ""
                         echo "Unsupported PhaseEncodingDirection: $PHASE_DIR. Skipping."
                         echo ""
                         continue
                     fi
                 fi
+                if [ "$DIR_LABEL" = "AP" ]; then
+                    OPP_LABEL="PA"
+                else
+                    OPP_LABEL="AP"
+                fi
 
                 AP_IMAGE="$FMAP_DERIV_DIR/${prefix}${TASK_ENTITY}${RUN_NUMBER_ENTITY}_acq-${DIR_LABEL}_epi.nii.gz"
-                PA_IMAGE="$FMAP_DERIV_DIR/${prefix}${TASK_ENTITY}${RUN_NUMBER_ENTITY}_acq-${OPP_LABEL}_epi.nii.gz"
                 ACQ_PARAMS_FILE="$FMAP_DERIV_DIR/${prefix}${TASK_ENTITY}${RUN_NUMBER_ENTITY}_acq-params.txt"
                 MERGED_AP_PA="$FMAP_DERIV_DIR/${prefix}${TASK_ENTITY}${RUN_NUMBER_ENTITY}_acq-${DIR_LABEL}_${OPP_LABEL}_merged.nii.gz"
                 TOPUP_OUTPUT_BASE="$FMAP_DERIV_DIR/${prefix}${TASK_ENTITY}${RUN_NUMBER_ENTITY}_topup"
@@ -279,9 +285,6 @@ shopt -s extglob
                 if [ -z "$PA_FILE" ]; then
                     PA_FILE=$(find "$SES_DIR/fmap" -type f -name "*_dir-${SEARCH_LABEL}_epi.nii" -print -quit)
                 fi
-                if [ -n "$PA_FILE" ]; then
-                    echo "  - Found explicit PA fieldmap: $PA_FILE"
-                fi
 
                 # If not found, look for matching BOLD runs or fallback to func/
                 if [ -z "$PA_FILE" ]; then
@@ -305,51 +308,53 @@ shopt -s extglob
                 # --------------------------------------------------
 
                 echo ""
-                echo "[Step 2] Extracting first volume of PA:"
-                echo ""
                 if [ -z "$PA_FILE" ]; then
                     echo ""
                     echo "  - No PA image found. Skipping topup for this run."
                     echo ""
                     continue
-                else
-                    echo "  - Input PA image: $PA_FILE"
-                    echo "  - Output PA image: $PA_IMAGE"
-                    fslroi "$PA_FILE" "$PA_IMAGE" 0 1
-                    echo ""
                 fi
 
                 PA_JSON="${PA_FILE%.nii.gz}.json"
                 PA_PHASE_DIR=$(jq -r '.PhaseEncodingDirection' "$PA_JSON")
                 PA_READOUT_TIME=$(jq -r '.TotalReadoutTime' "$PA_JSON")
 
-                if [[ "$PHASE_DIR" == "j-" ]]; then
-                    echo "0 -1 0 $READOUT_TIME" > "$ACQ_PARAMS_FILE"
-                elif [[ "$PHASE_DIR" == "j" ]]; then
+                if [[ "$PA_FILE" == *"_dir-AP_"* ]]; then
+                    FMAP_LABEL="AP"
+                elif [[ "$PA_FILE" == *"_dir-PA_"* ]]; then
+                    FMAP_LABEL="PA"
+                else
+                    FMAP_LABEL=$(map_phase_dir_to_label "$PA_PHASE_DIR")
+                fi
+                [ -z "$FMAP_LABEL" ] && FMAP_LABEL="$OPP_LABEL"
+
+                PA_IMAGE="$FMAP_DERIV_DIR/${prefix}${TASK_ENTITY}${RUN_NUMBER_ENTITY}_acq-${FMAP_LABEL}_epi.nii.gz"
+                MERGED_AP_PA="$FMAP_DERIV_DIR/${prefix}${TASK_ENTITY}${RUN_NUMBER_ENTITY}_acq-${DIR_LABEL}_${FMAP_LABEL}_merged.nii.gz"
+
+                echo "[Step 2] Extracting first volume of ${FMAP_LABEL}:"
+                echo ""
+                echo "  - Input ${FMAP_LABEL} image: $PA_FILE"
+                echo "  - Output ${FMAP_LABEL} image: $PA_IMAGE"
+                fslroi "$PA_FILE" "$PA_IMAGE" 0 1
+                echo ""
+
+                if [ "$DIR_LABEL" = "AP" ]; then
                     echo "0 1 0 $READOUT_TIME" > "$ACQ_PARAMS_FILE"
                 else
-                    echo ""
-                    echo "Unsupported PhaseEncodingDirection: $PHASE_DIR. Skipping."
-                    echo ""
-                    continue
+                    echo "0 -1 0 $READOUT_TIME" > "$ACQ_PARAMS_FILE"
                 fi
 
-                if [[ "$PA_PHASE_DIR" == "j" ]]; then
+                if [ "$FMAP_LABEL" = "AP" ]; then
                     echo "0 1 0 $PA_READOUT_TIME" >> "$ACQ_PARAMS_FILE"
-                elif [[ "$PA_PHASE_DIR" == "j-" ]]; then
-                    echo "0 -1 0 $PA_READOUT_TIME" >> "$ACQ_PARAMS_FILE"
                 else
-                    echo ""
-                    echo "Unsupported PhaseEncodingDirection for PA: $PA_PHASE_DIR. Skipping."
-                    echo ""
-                    continue
+                    echo "0 -1 0 $PA_READOUT_TIME" >> "$ACQ_PARAMS_FILE"
                 fi
 
                 echo ""
-                echo "[Step 3] Merging AP and PA images:"
+                echo "[Step 3] Merging ${DIR_LABEL} and ${FMAP_LABEL} images:"
                 echo ""
-                echo "  - Input AP: $AP_IMAGE"
-                echo "  - Input PA: $PA_IMAGE"
+                echo "  - Input ${DIR_LABEL}: $AP_IMAGE"
+                echo "  - Input ${FMAP_LABEL}: $PA_IMAGE"
                 echo "  - Output: $MERGED_AP_PA"
                 fslmerge -t "$MERGED_AP_PA" "$AP_IMAGE" "$PA_IMAGE"
                 echo ""
@@ -357,7 +362,7 @@ shopt -s extglob
                 echo ""
                 echo "[Step 4] Estimating susceptibility (topup):"
                 echo ""
-                echo "  - Input (merged AP and PA): $MERGED_AP_PA"
+                echo "  - Input (merged ${DIR_LABEL} and ${FMAP_LABEL}): $MERGED_AP_PA"
                 echo "  - Acquisition parameters file: $ACQ_PARAMS_FILE"
                 echo "  - Output base: ${TOPUP_OUTPUT_BASE}_results"
                 echo "  - Fieldmap output: ${TOPUP_OUTPUT_BASE}_fieldmap.nii.gz"

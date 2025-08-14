@@ -1,6 +1,4 @@
-"""
-Simple command‑line helpers used by *bids‑cbrain‑cli* and other entry points
-in **bids_cbrain_runner**.
+"""Command-line helpers for the :mod:`bids_cbrain_runner` CLI.
 
 The public surface is intentionally minimal; at the moment there is only
 :pyfunc:`parse_kv_pair`, but centralising the parser logic here keeps the main
@@ -8,10 +6,10 @@ CLI implementation concise and makes unit testing straightforward.
 
 Rationale
 ~~~~~~~~~
-Many CBRAIN tools expose a large number of optional parameters.  Allowing them
+Many CBRAIN tools expose a large number of optional parameters. Allowing them
 to be specified on the command line as ``--tool-param KEY=VALUE`` pairs gives
-flexibility without inflating the CLI with dozens of bespoke flags.  Parsing
-with :pymod:`ast` enables automatic interpretation of standard Python
+flexibility without inflating the CLI with dozens of bespoke flags. Parsing
+with :mod:`ast` enables automatic interpretation of standard Python
 literals—e.g. numbers, lists, dictionaries—so callers do not need to quote or
 cast values manually.
 

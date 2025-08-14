@@ -73,6 +73,8 @@ Options:
   --highpass-cutoff <value>    : High-pass filter cutoff in seconds
   --use-bbr                    : Use BBR registration
   --apply-nuisance-reg         : Apply nuisance regression after ICA-AROMA
+  --design-only                : Only generate design files, skip running FEAT
+  --keep-full-paths            : When used with --design-only, keep full paths in design files
   --help, -h                   : Display this help text
 
 Environment variables:
@@ -248,6 +250,8 @@ HIGHPASS_CUTOFF=""
 APPLY_HIGHPASS_FILTERING=false
 USE_BBR=false
 APPLY_NUISANCE_REG=false
+DESIGN_ONLY=false
+KEEP_FULL_PATHS=false
 T1_IMAGE=""
 FUNC_IMAGE=""
 TEMPLATE=""
@@ -339,6 +343,14 @@ while [[ $# -gt 0 ]]; do
       APPLY_NUISANCE_REG=true
       shift
       ;;
+    --design-only)
+      DESIGN_ONLY=true
+      shift
+      ;;
+    --keep-full-paths)
+      KEEP_FULL_PATHS=true
+      shift
+      ;;
     *)
       echo "Unknown option: $1"
       usage
@@ -355,6 +367,8 @@ TEMPLATE=$(echo "$TEMPLATE" | tr -d "'\"")
 OUTPUT_DIR=$(echo "$OUTPUT_DIR" | tr -d "'\"")
 PREPROC_OUTPUT_DIR=$(echo "$PREPROC_OUTPUT_DIR" | tr -d "'\"")
 ANALYSIS_OUTPUT_DIR=$(echo "$ANALYSIS_OUTPUT_DIR" | tr -d "'\"")
+DESIGN_ONLY=$(echo "$DESIGN_ONLY" | tr -d "'\"")
+KEEP_FULL_PATHS=$(echo "$KEEP_FULL_PATHS" | tr -d "'\"")
 
 # Determine optional session segments for paths and filenames
 session_path=""
@@ -420,6 +434,22 @@ adjust_highpass_filter_settings() {
     sed "s|@HIGHPASS_CUTOFF@|$highpass_cutoff|g" "$infile" > "$outfile"
   else
     sed "s|@HIGHPASS_CUTOFF@|0|g" "$infile" > "$outfile"
+  fi
+}
+
+strip_paths_if_needed() {
+  local file="$1"
+  if [ "$KEEP_FULL_PATHS" = false ]; then
+    apply_sed_replacement "$file" "$FUNC_IMAGE" "$(basename \"$FUNC_IMAGE\")"
+    apply_sed_replacement "$file" "$T1_IMAGE" "$(basename \"$T1_IMAGE\")"
+    apply_sed_replacement "$file" "$TEMPLATE" "$(basename \"$TEMPLATE\")"
+    [ -n "$OUTPUT_DIR" ] && apply_sed_replacement "$file" "$OUTPUT_DIR" "$(basename \"$OUTPUT_DIR\")"
+    [ -n "$PREPROC_OUTPUT_DIR" ] && apply_sed_replacement "$file" "$PREPROC_OUTPUT_DIR" "$(basename \"$PREPROC_OUTPUT_DIR\")"
+    [ -n "$ANALYSIS_OUTPUT_DIR" ] && apply_sed_replacement "$file" "$ANALYSIS_OUTPUT_DIR" "$(basename \"$ANALYSIS_OUTPUT_DIR\")"
+    sed -i 's/""/"/g' "$file"
+    apply_sed_replacement "$file" "set fmri(relative_yn) .*" "set fmri(relative_yn) 0"
+  else
+    apply_sed_replacement "$file" "set fmri(relative_yn) .*" "set fmri(relative_yn) 1"
   fi
 }
 
@@ -516,90 +546,83 @@ if [ "$ICA_AROMA" = true ]; then
   fi
 
   # 1A. FEAT Preprocessing
-  if [ ! -d "$PREPROC_OUTPUT_DIR" ]; then
-    MODIFIED_PREPROC_DESIGN_FILE="$(dirname "$PREPROC_OUTPUT_DIR")/modified_${SUBJECT}${session_label}${RUN}_$(basename "$PREPROC_DESIGN_FILE")"
-    mkdir -p "$(dirname "$MODIFIED_PREPROC_DESIGN_FILE")"
+  PREPROC_DESIGN_OUT="$(dirname "$PREPROC_OUTPUT_DIR")/${SUBJECT}${session_label}_${RUN}_$(basename "$PREPROC_DESIGN_FILE")"
+  mkdir -p "$(dirname "$PREPROC_DESIGN_OUT")"
 
-    sed -e "s|@OUTPUT_DIR@|$PREPROC_OUTPUT_DIR|g" \
-        -e "s|@FUNC_IMAGE@|$FUNC_IMAGE|g" \
-        -e "s|@T1_IMAGE@|$T1_IMAGE|g" \
-        -e "s|@TEMPLATE@|$TEMPLATE|g" \
-        -e "s|@NPTS@|$npts|g" \
-        -e "s|@TR@|$tr|g" \
-        "$PREPROC_DESIGN_FILE" > "$MODIFIED_PREPROC_DESIGN_FILE.tmp"
+  sed -e "s|@OUTPUT_DIR@|$PREPROC_OUTPUT_DIR|g" \
+      -e "s|@FUNC_IMAGE@|$FUNC_IMAGE|g" \
+      -e "s|@T1_IMAGE@|$T1_IMAGE|g" \
+      -e "s|@TEMPLATE@|$TEMPLATE|g" \
+      -e "s|@NPTS@|$npts|g" \
+      -e "s|@TR@|$tr|g" \
+      "$PREPROC_DESIGN_FILE" > "$PREPROC_DESIGN_OUT.tmp"
 
-    adjust_slice_timing_settings \
-      "$MODIFIED_PREPROC_DESIGN_FILE.tmp" \
-      "$MODIFIED_PREPROC_DESIGN_FILE" \
-      "$SLICE_TIMING_FILE"
+  adjust_slice_timing_settings \
+    "$PREPROC_DESIGN_OUT.tmp" \
+    "$PREPROC_DESIGN_OUT" \
+    "$SLICE_TIMING_FILE"
 
-    rm "$MODIFIED_PREPROC_DESIGN_FILE.tmp"
+  rm "$PREPROC_DESIGN_OUT.tmp"
 
-    # Non-linear registration
-    if [ "$NONLINEAR_REG" = true ]; then
-      apply_sed_replacement "$MODIFIED_PREPROC_DESIGN_FILE" \
-        "set fmri(regstandard_nonlinear_yn) .*" \
-        "set fmri(regstandard_nonlinear_yn) 1"
-    else
-      apply_sed_replacement "$MODIFIED_PREPROC_DESIGN_FILE" \
-        "set fmri(regstandard_nonlinear_yn) .*" \
-        "set fmri(regstandard_nonlinear_yn) 0"
-    fi
-
-    # BBR or 12 DOF
-    if [ "$USE_BBR" = true ]; then
-      apply_sed_replacement "$MODIFIED_PREPROC_DESIGN_FILE" \
-        "set fmri(reghighres_dof) .*" \
-        "set fmri(reghighres_dof) BBR"
-    else
-      apply_sed_replacement "$MODIFIED_PREPROC_DESIGN_FILE" \
-        "set fmri(reghighres_dof) .*" \
-        "set fmri(reghighres_dof) 12"
-    fi
-
-    echo ""
-    echo "[FEAT PREPROCESSING]"
-    feat "$MODIFIED_PREPROC_DESIGN_FILE" || { echo "FEAT preprocessing failed."; exit 1; }
-    rm -f "$MODIFIED_PREPROC_DESIGN_FILE"
-    echo "- FEAT preprocessing completed at $PREPROC_OUTPUT_DIR"
-
-    # Build an array for the --generatedby flags
-    preproc_generatedby_args=()
-    for gb_item in "${PREPROC_GENERATEDBY[@]}"; do
-      preproc_generatedby_args+=(--generatedby "$gb_item")
-    done
-
-     # Pass that array
-     # Create dataset_description.json in preprocessing_preICA top-level
-    PREPROC_TOP_DIR="$(get_top_level_analysis_dir "$PREPROC_OUTPUT_DIR")"
-    "$SCRIPT_DIR/create_dataset_description.sh" \
-      --analysis-dir "$PREPROC_TOP_DIR" \
-      --ds-name "$PREPROC_DS_NAME" \
-      --dataset-type "$PREPROC_DS_TYPE" \
-      --description "$PREPROC_DS_DESC" \
-      --bids-version "$BIDS_VERSION" \
-      "${preproc_generatedby_args[@]}"
-      
-    output_dir_name=$(basename "$PREPROC_OUTPUT_DIR" .feat)
-    mask_output="${PREPROC_OUTPUT_DIR}/${output_dir_name}_example_func_mask.nii.gz"
-    example_func="${PREPROC_OUTPUT_DIR}/example_func.nii.gz"
-
-    echo ""
-    echo "[MASK CREATION]"
-    bet "$example_func" "$mask_output" -f 0.3 || { echo "Mask creation failed."; exit 1; }
-    echo "- Mask created at $mask_output"
+  if [ "$NONLINEAR_REG" = true ]; then
+    apply_sed_replacement "$PREPROC_DESIGN_OUT" \
+      "set fmri(regstandard_nonlinear_yn) .*" \
+      "set fmri(regstandard_nonlinear_yn) 1"
   else
-    echo ""
-    echo "[FEAT PREPROCESSING]"
-    echo "FEAT preprocessing already completed at $PREPROC_OUTPUT_DIR"
-    output_dir_name=$(basename "$PREPROC_OUTPUT_DIR" .feat)
-    mask_output="${PREPROC_OUTPUT_DIR}/${output_dir_name}_example_func_mask.nii.gz"
-    example_func="${PREPROC_OUTPUT_DIR}/example_func.nii.gz"
-    if [ ! -f "$mask_output" ]; then
+    apply_sed_replacement "$PREPROC_DESIGN_OUT" \
+      "set fmri(regstandard_nonlinear_yn) .*" \
+      "set fmri(regstandard_nonlinear_yn) 0"
+  fi
+
+  if [ "$USE_BBR" = true ]; then
+    apply_sed_replacement "$PREPROC_DESIGN_OUT" \
+      "set fmri(reghighres_dof) .*" \
+      "set fmri(reghighres_dof) BBR"
+  else
+    apply_sed_replacement "$PREPROC_DESIGN_OUT" \
+      "set fmri(reghighres_dof) .*" \
+      "set fmri(reghighres_dof) 12"
+  fi
+
+  strip_paths_if_needed "$PREPROC_DESIGN_OUT"
+
+  echo ""
+  echo "[FEAT PREPROCESSING]"
+  if [ "$DESIGN_ONLY" = true ]; then
+    echo "Only creating design.fsf files. Skipping."
+  else
+    if [ ! -d "$PREPROC_OUTPUT_DIR" ]; then
+      feat "$PREPROC_DESIGN_OUT" || { echo "FEAT preprocessing failed."; exit 1; }
+      echo "- FEAT preprocessing completed at $PREPROC_OUTPUT_DIR"
+
+      preproc_generatedby_args=()
+      for gb_item in "${PREPROC_GENERATEDBY[@]}"; do
+        preproc_generatedby_args+=(--generatedby "$gb_item")
+      done
+
+      PREPROC_TOP_DIR="$(get_top_level_analysis_dir "$PREPROC_OUTPUT_DIR")"
+      "$SCRIPT_DIR/create_dataset_description.sh" \
+        --analysis-dir "$PREPROC_TOP_DIR" \
+        --ds-name "$PREPROC_DS_NAME" \
+        --dataset-type "$PREPROC_DS_TYPE" \
+        --description "$PREPROC_DS_DESC" \
+        --bids-version "$BIDS_VERSION" \
+        "${preproc_generatedby_args[@]}"
+
+      output_dir_name=$(basename "$PREPROC_OUTPUT_DIR" .feat)
+      mask_output="${PREPROC_OUTPUT_DIR}/${output_dir_name}_example_func_mask.nii.gz"
+      example_func="${PREPROC_OUTPUT_DIR}/example_func.nii.gz"
+
+      echo ""
+      echo "[MASK CREATION]"
       bet "$example_func" "$mask_output" -f 0.3 || { echo "Mask creation failed."; exit 1; }
       echo "- Mask created at $mask_output"
+    else
+      echo "FEAT preprocessing already completed at $PREPROC_OUTPUT_DIR"
     fi
   fi
+
+
 
   # 1B. ICA-AROMA
   echo -e "\n[ICA-AROMA PROCESSING]"
@@ -610,6 +633,10 @@ if [ "$ICA_AROMA" = true ]; then
     ICA_AROMA_OUTPUT_DIR="${ICA_AROMA_OUTPUT_DIR}/${SUBJECT}${session_label}_${RUN}.feat"
   fi
 
+  if [ "$DESIGN_ONLY" = true ]; then
+    echo "Only creating design.fsf files. Skipping."
+  else
+  
   denoised_func="${ICA_AROMA_OUTPUT_DIR}/denoised_func_data_nonaggr.nii.gz"
   if [ ! -f "$denoised_func" ]; then
     filtered_func_data="${PREPROC_OUTPUT_DIR}/filtered_func_data.nii.gz"
@@ -655,11 +682,15 @@ if [ "$ICA_AROMA" = true ]; then
     echo "ICA-AROMA already processed at $denoised_func"
   fi
 
+  fi
+
 
   # 1C. Optional nuisance regression
   echo ""
   echo "[NUISANCE REGRESSION AFTER ICA-AROMA]"
-  if [ "$APPLY_NUISANCE_REG" = true ]; then
+  if [ "$DESIGN_ONLY" = true ]; then
+    echo "Only creating design.fsf files. Skipping."
+  elif [ "$APPLY_NUISANCE_REG" = true ]; then
     nuisance_regressed_func="${ICA_AROMA_OUTPUT_DIR}/denoised_func_data_nonaggr_nuis.nii.gz"
     if [ -f "$nuisance_regressed_func" ]; then
       echo "Nuisance regression already performed at $nuisance_regressed_func"
@@ -739,97 +770,80 @@ if [ "$ICA_AROMA" = true ]; then
   if [ -n "$ANALYSIS_OUTPUT_DIR" ] && [ -n "$DESIGN_FILE" ]; then
     echo ""
     echo "[FEAT MAIN ANALYSIS (POST-ICA)]"
-    if [ -d "$ANALYSIS_OUTPUT_DIR" ]; then
-      echo "FEAT main analysis (post-ICA) already exists at $ANALYSIS_OUTPUT_DIR"
+
+    ANALYSIS_DESIGN_OUT_DIR="$(dirname "$ANALYSIS_OUTPUT_DIR")"
+    design_prefix="${SUBJECT}${session_label}"
+    [ -n "$TASK" ] && design_prefix+="_task-${TASK}"
+    design_prefix+="_${RUN}"
+    ANALYSIS_DESIGN_FILE="${ANALYSIS_DESIGN_OUT_DIR}/${design_prefix}_$(basename "$DESIGN_FILE")"
+    mkdir -p "$ANALYSIS_DESIGN_OUT_DIR"
+
+    if [ "$DESIGN_ONLY" = true ]; then
+      npts=$(fslval "$FUNC_IMAGE" dim4 | xargs)
+      tr=$(fslval "$FUNC_IMAGE" pixdim4 | xargs)
     else
       if [ ! -f "$denoised_func" ]; then
         echo "Denoised data not found before main stats. Skipping."
         exit 0
       fi
-
       npts=$(fslval "$denoised_func" dim4 | xargs)
       tr=$(fslval "$denoised_func" pixdim4 | xargs)
-      tr=$(LC_NUMERIC=C printf "%.6f" "$tr")
+    fi
+    tr=$(LC_NUMERIC=C printf "%.6f" "$tr")
 
-      MODIFIED_DESIGN_FILE="$(dirname "$ANALYSIS_OUTPUT_DIR")/modified_${SUBJECT}${session_label}${RUN}_$(basename "$DESIGN_FILE")"
-      mkdir -p "$(dirname "$MODIFIED_DESIGN_FILE")"
+    sed -e "s|@OUTPUT_DIR@|$ANALYSIS_OUTPUT_DIR|g" \
+        -e "s|@FUNC_IMAGE@|$denoised_func|g" \
+        -e "s|@T1_IMAGE@|$T1_IMAGE|g" \
+        -e "s|@TEMPLATE@|$TEMPLATE|g" \
+        -e "s|@NPTS@|$npts|g" \
+        -e "s|@TR@|$tr|g" \
+        "$DESIGN_FILE" > "$ANALYSIS_DESIGN_FILE.tmp"
 
-      sed -e "s|@OUTPUT_DIR@|$ANALYSIS_OUTPUT_DIR|g" \
-          -e "s|@FUNC_IMAGE@|$denoised_func|g" \
-          -e "s|@T1_IMAGE@|$T1_IMAGE|g" \
-          -e "s|@TEMPLATE@|$TEMPLATE|g" \
-          -e "s|@NPTS@|$npts|g" \
-          -e "s|@TR@|$tr|g" \
-          "$DESIGN_FILE" > "$MODIFIED_DESIGN_FILE.tmp"
+    USE_SLICE_TIMING=false
+    SLICE_TIMING_FILE=""
+    adjust_slice_timing_settings "$ANALYSIS_DESIGN_FILE.tmp" "$ANALYSIS_DESIGN_FILE.hp" "$SLICE_TIMING_FILE"
+    adjust_highpass_filter_settings "$ANALYSIS_DESIGN_FILE.hp" "$ANALYSIS_DESIGN_FILE" "$HIGHPASS_CUTOFF"
+    rm "$ANALYSIS_DESIGN_FILE.tmp" "$ANALYSIS_DESIGN_FILE.hp"
 
-      # Post-ICA: do NOT re-apply slice timing
-      USE_SLICE_TIMING=false
-      SLICE_TIMING_FILE=""
+    if [ "$NONLINEAR_REG" = true ]; then
+      apply_sed_replacement "$ANALYSIS_DESIGN_FILE" "set fmri(regstandard_nonlinear_yn) .*" "set fmri(regstandard_nonlinear_yn) 1"
+    else
+      apply_sed_replacement "$ANALYSIS_DESIGN_FILE" "set fmri(regstandard_nonlinear_yn) .*" "set fmri(regstandard_nonlinear_yn) 0"
+    fi
 
-      adjust_slice_timing_settings \
-        "$MODIFIED_DESIGN_FILE.tmp" \
-        "$MODIFIED_DESIGN_FILE.hp" \
-        "$SLICE_TIMING_FILE"
+    if [ "$USE_BBR" = true ]; then
+      apply_sed_replacement "$ANALYSIS_DESIGN_FILE" "set fmri(reghighres_dof) .*" "set fmri(reghighres_dof) BBR"
+    else
+      apply_sed_replacement "$ANALYSIS_DESIGN_FILE" "set fmri(reghighres_dof) .*" "set fmri(reghighres_dof) 12"
+    fi
 
-      adjust_highpass_filter_settings \
-        "$MODIFIED_DESIGN_FILE.hp" \
-        "$MODIFIED_DESIGN_FILE" \
-        "$HIGHPASS_CUTOFF"
+    for ((i=0; i<${#EV_FILES[@]}; i++)); do
+      ev_num=$((i+1))
+      apply_sed_replacement "$ANALYSIS_DESIGN_FILE" "@EV${ev_num}@" "${EV_FILES[i]}"
+    done
 
-      rm "$MODIFIED_DESIGN_FILE.tmp" "$MODIFIED_DESIGN_FILE.hp"
+    strip_paths_if_needed "$ANALYSIS_DESIGN_FILE"
 
-      # Non-linear registration
-      if [ "$NONLINEAR_REG" = true ]; then
-        apply_sed_replacement "$MODIFIED_DESIGN_FILE" \
-          "set fmri(regstandard_nonlinear_yn) .*" \
-          "set fmri(regstandard_nonlinear_yn) 1"
-      else
-        apply_sed_replacement "$MODIFIED_DESIGN_FILE" \
-          "set fmri(regstandard_nonlinear_yn) .*" \
-          "set fmri(regstandard_nonlinear_yn) 0"
-      fi
+    if [ "$DESIGN_ONLY" = true ]; then
+      echo "Only creating design.fsf files. Skipping."
+    else
+      feat "$ANALYSIS_DESIGN_FILE" || { echo "FEAT main analysis failed."; exit 1; }
+      echo "- FEAT main analysis (post-ICA) completed at $ANALYSIS_OUTPUT_DIR"
 
-      # BBR or 12 DOF
-      if [ "$USE_BBR" = true ]; then
-        apply_sed_replacement "$MODIFIED_DESIGN_FILE" \
-          "set fmri(reghighres_dof) .*" \
-          "set fmri(reghighres_dof) BBR"
-      else
-        apply_sed_replacement "$MODIFIED_DESIGN_FILE" \
-          "set fmri(reghighres_dof) .*" \
-          "set fmri(reghighres_dof) 12"
-      fi
-
-      # Insert EV files
-      for ((i=0; i<${#EV_FILES[@]}; i++)); do
-        ev_num=$((i+1))
-        apply_sed_replacement "$MODIFIED_DESIGN_FILE" \
-          "@EV${ev_num}@" \
-          "${EV_FILES[i]}"
+      postica_generatedby_args=()
+      for gb_item in "${POSTICA_GENERATEDBY[@]}"; do
+        postica_generatedby_args+=(--generatedby "$gb_item")
       done
 
-      echo "Running FEAT main analysis (post-ICA)..."
-      feat "$MODIFIED_DESIGN_FILE" || { echo "FEAT main analysis failed."; exit 1; }
-      rm -f "$MODIFIED_DESIGN_FILE"
-      echo "- FEAT main analysis (post-ICA) completed at $ANALYSIS_OUTPUT_DIR"
+      TOP_ANALYSIS_DIR="$(get_top_level_analysis_dir "$ANALYSIS_OUTPUT_DIR")"
+      "$SCRIPT_DIR/create_dataset_description.sh" \
+        --analysis-dir "$TOP_ANALYSIS_DIR" \
+        --ds-name "$POSTICA_DS_NAME" \
+        --dataset-type "$POSTICA_DS_TYPE" \
+        --description "$POSTICA_DS_DESC" \
+        --bids-version "$BIDS_VERSION" \
+        "${postica_generatedby_args[@]}"
     fi
-    
-    # Build an array for the --generatedby flags
-    postica_generatedby_args=()
-    for gb_item in "${POSTICA_GENERATEDBY[@]}"; do
-      postica_generatedby_args+=(--generatedby "$gb_item")
-    done
-    
-    # Create dataset_description.json in analysis_postICA top-level
-    TOP_ANALYSIS_DIR="$(get_top_level_analysis_dir "$ANALYSIS_OUTPUT_DIR")"
-    "$SCRIPT_DIR/create_dataset_description.sh" \
-      --analysis-dir "$TOP_ANALYSIS_DIR" \
-      --ds-name "$POSTICA_DS_NAME" \
-      --dataset-type "$POSTICA_DS_TYPE" \
-      --description "$POSTICA_DS_DESC" \
-      --bids-version "$BIDS_VERSION" \
-      "${postica_generatedby_args[@]}"
-
   else
     echo ""
     echo "Preprocessing and ICA-AROMA completed (no main stats)."
@@ -848,8 +862,10 @@ else
     echo ""
     echo "FEAT analysis already exists at $OUTPUT_DIR"
   else
-    MODIFIED_DESIGN_FILE="$(dirname "$OUTPUT_DIR")/modified_${SUBJECT}${session_label}${RUN}_$(basename "$DESIGN_FILE")"
-    mkdir -p "$(dirname "$MODIFIED_DESIGN_FILE")"
+    DESIGN_OUT_DIR="$(dirname "$OUTPUT_DIR")"
+    design_prefix="${SUBJECT}${session_label}_${RUN}"
+    DESIGN_OUT_FILE="${DESIGN_OUT_DIR}/${design_prefix}_$(basename "$DESIGN_FILE")"
+    mkdir -p "$DESIGN_OUT_DIR"
 
     sed -e "s|@OUTPUT_DIR@|$OUTPUT_DIR|g" \
         -e "s|@FUNC_IMAGE@|$FUNC_IMAGE|g" \
@@ -857,38 +873,38 @@ else
         -e "s|@TEMPLATE@|$TEMPLATE|g" \
         -e "s|@NPTS@|$npts|g" \
         -e "s|@TR@|$tr|g" \
-        "$DESIGN_FILE" > "$MODIFIED_DESIGN_FILE.tmp"
+        "$DESIGN_FILE" > "$DESIGN_OUT_FILE.tmp"
 
     adjust_slice_timing_settings \
-      "$MODIFIED_DESIGN_FILE.tmp" \
-      "$MODIFIED_DESIGN_FILE.hp" \
+      "$DESIGN_OUT_FILE.tmp" \
+      "$DESIGN_OUT_FILE.hp" \
       "$SLICE_TIMING_FILE"
 
     adjust_highpass_filter_settings \
-      "$MODIFIED_DESIGN_FILE.hp" \
-      "$MODIFIED_DESIGN_FILE" \
+      "$DESIGN_OUT_FILE.hp" \
+      "$DESIGN_OUT_FILE" \
       "$HIGHPASS_CUTOFF"
 
-    rm "$MODIFIED_DESIGN_FILE.tmp" "$MODIFIED_DESIGN_FILE.hp"
+    rm "$DESIGN_OUT_FILE.tmp" "$DESIGN_OUT_FILE.hp"
 
     # Non-linear registration
     if [ "$NONLINEAR_REG" = true ]; then
-      apply_sed_replacement "$MODIFIED_DESIGN_FILE" \
+      apply_sed_replacement "$DESIGN_OUT_FILE" \
         "set fmri(regstandard_nonlinear_yn) .*" \
         "set fmri(regstandard_nonlinear_yn) 1"
     else
-      apply_sed_replacement "$MODIFIED_DESIGN_FILE" \
+      apply_sed_replacement "$DESIGN_OUT_FILE" \
         "set fmri(regstandard_nonlinear_yn) .*" \
         "set fmri(regstandard_nonlinear_yn) 0"
     fi
 
     # BBR or 12 DOF
     if [ "$USE_BBR" = true ]; then
-      apply_sed_replacement "$MODIFIED_DESIGN_FILE" \
+      apply_sed_replacement "$DESIGN_OUT_FILE" \
         "set fmri(reghighres_dof) .*" \
         "set fmri(reghighres_dof) BBR"
     else
-      apply_sed_replacement "$MODIFIED_DESIGN_FILE" \
+      apply_sed_replacement "$DESIGN_OUT_FILE" \
         "set fmri(reghighres_dof) .*" \
         "set fmri(reghighres_dof) 12"
     fi
@@ -896,35 +912,41 @@ else
     # Insert EV files
     for ((i=0; i<${#EV_FILES[@]}; i++)); do
       ev_num=$((i+1))
-      apply_sed_replacement "$MODIFIED_DESIGN_FILE" \
+      apply_sed_replacement "$DESIGN_OUT_FILE" \
         "@EV${ev_num}@" \
         "${EV_FILES[i]}"
     done
 
+    strip_paths_if_needed "$DESIGN_OUT_FILE"
+
     echo ""
     echo "[FEAT MAIN ANALYSIS]"
-    feat "$MODIFIED_DESIGN_FILE" || { echo "FEAT failed."; exit 1; }
-    rm -f "$MODIFIED_DESIGN_FILE"
-    echo "- FEAT main analysis completed at $OUTPUT_DIR"
+    if [ "$DESIGN_ONLY" = true ]; then
+      echo "Only creating design.fsf files. Skipping."
+    else
+      feat "$DESIGN_OUT_FILE" || { echo "FEAT failed."; exit 1; }
+      echo "- FEAT main analysis completed at $OUTPUT_DIR"
+    fi
   fi
 
   
   
     # Build an array for the --generatedby flags
-    feat_generatedby_args=()
-    for gb_item in "${FEAT_GENERATEDBY[@]}"; do
-      feat_generatedby_args+=(--generatedby "$gb_item")
-    done
-  
-   # Create dataset_description.json in analysis top-level
-  TOP_ANALYSIS_DIR="$(get_top_level_analysis_dir "$OUTPUT_DIR")"
-  "$SCRIPT_DIR/create_dataset_description.sh" \
-    --analysis-dir "$TOP_ANALYSIS_DIR" \
-    --ds-name "$FEAT_DS_NAME" \
-    --dataset-type "$FEAT_DS_TYPE" \
-    --description "$FEAT_DS_DESC" \
-    --bids-version "$BIDS_VERSION" \
-    "${feat_generatedby_args[@]}"
+    if [ "$DESIGN_ONLY" != true ]; then
+      feat_generatedby_args=()
+      for gb_item in "${FEAT_GENERATEDBY[@]}"; do
+        feat_generatedby_args+=(--generatedby "$gb_item")
+      done
+
+      TOP_ANALYSIS_DIR="$(get_top_level_analysis_dir "$OUTPUT_DIR")"
+      "$SCRIPT_DIR/create_dataset_description.sh" \
+        --analysis-dir "$TOP_ANALYSIS_DIR" \
+        --ds-name "$FEAT_DS_NAME" \
+        --dataset-type "$FEAT_DS_TYPE" \
+        --description "$FEAT_DS_DESC" \
+        --bids-version "$BIDS_VERSION" \
+        "${feat_generatedby_args[@]}"
+    fi
 fi
 
 # Cleanup extraneous files

@@ -1,5 +1,4 @@
-"""
-Command‑line entry‑point that orchestrates the high‑level *bids* action:
+"""Command-line entry point that orchestrates the high-level *bids* action.
 
 * Resolves dataset roots and YAML configuration overrides.
 * Expands subject/session paths before passing control to dedicated pipeline
@@ -238,9 +237,9 @@ def cli(  # type: ignore[override]
     filter_sub: Tuple[str, ...],
     filter_ses: Tuple[str, ...],
 ) -> None:
-    """Main entry‑point for ``bidscomatic-cli bids``.
+    """Run the ``bidscomatic-cli bids`` command.
 
-    The function coordinates pipeline helpers based on CLI flags.  Execution
+    The function coordinates pipeline helpers based on CLI flags. Execution
     stops early when filters exclude all subjects/sessions.
 
     Args:
@@ -256,7 +255,6 @@ def cli(  # type: ignore[override]
         filter_sub: Subject filter values.
         filter_ses: Session filter values.
     """
-
     root: Path = ctx_obj["root"]
 
     # Auto‑detect dataset root from positional paths -------------------------

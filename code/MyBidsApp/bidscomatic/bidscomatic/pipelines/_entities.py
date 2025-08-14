@@ -1,6 +1,4 @@
-"""
-Utility helpers for rendering *template* BIDS entity tables into
-concrete values.
+"""Render template BIDS entity tables into concrete values.
 
 Key behaviours
 --------------

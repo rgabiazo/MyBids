@@ -1,6 +1,4 @@
-"""
-Move diffusion-weighted NIfTIs (plus side-cars) from *sourcedata/nifti* into
-``sub-*/[ses-*]/dwi/`` according to the mapping in *series.yaml*.
+"""Move diffusion-weighted NIfTIs from *sourcedata/nifti* into ``sub-*/[ses-*]/dwi/``.
 
 Key points
 ----------

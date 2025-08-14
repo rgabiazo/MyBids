@@ -54,7 +54,6 @@ LOG_DIR="${BASE_DIR}/code/logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="${LOG_DIR}/feat_first_level_analysis_$(date +%Y-%m-%d_%H-%M-%S).log"
 exec > >(tee -a "$LOG_FILE") 2>&1
-echo "Log file: $LOG_FILE"
 
 # Load config.yaml
 CONFIG_FILE="${BASE_DIR}/code/config/config.yaml"
@@ -84,6 +83,8 @@ FEAT_DS_TYPE="$(yq e '.dataset_descriptions.level-1.feat_analysis.dataset_type' 
 FEAT_DS_DESC="$(yq e '.dataset_descriptions.level-1.feat_analysis.description' "$CONFIG_FILE")"
 
 DESIGN_FILES_DIR="${BASE_DIR}/code/design_files"
+design_only=false
+keep_full_paths=false
 
 ###############################################################################
 # Prompt for analysis choices
@@ -137,6 +138,42 @@ while true; do
     [Nn]* )
       slice_timing_correction=false
       echo -e "Skipping slice timing correction.\n"
+      break
+      ;;
+    * ) echo "Invalid input, please enter y or n." ;;
+esac
+done
+
+# Design-only option
+while true; do
+  echo -ne "Do you want to create only design files and skip feat? (y/n): "
+  read design_only_input
+  case "$design_only_input" in
+    [Yy]* )
+      design_only=true
+      echo "Skipping Feat."
+      while true; do
+        echo -ne "Do you want to keep full paths in design files? (y/n): "
+        read keep_full_paths_input
+        case "$keep_full_paths_input" in
+          [Yy]* )
+            keep_full_paths=true
+            break
+            ;;
+          [Nn]* )
+            keep_full_paths=false
+            echo "Skipping full paths in design.fsf files."
+            echo ""
+            break
+            ;;
+          * ) echo "Invalid input, please enter y or n." ;;
+        esac
+      done
+      break
+      ;;
+    [Nn]* )
+      design_only=false
+      keep_full_paths=false
       break
       ;;
     * ) echo "Invalid input, please enter y or n." ;;
@@ -230,11 +267,11 @@ select_design_file() {
     echo "Multiple design files found:"
     PS3=$'Select the design file (enter a number):\n> '
     select selected_design_file in "${design_files[@]}"; do
-      echo "> $REPLY"
       if [ -n "$selected_design_file" ]; then
         DEFAULT_DESIGN_FILE="$selected_design_file"
         break
       else
+        echo "> $REPLY"
         echo "Invalid selection."
       fi
     done
@@ -311,7 +348,7 @@ while true; do
 done
 
 BET_DIR="${BASE_DIR}/derivatives/fsl"
-SYNTHSTRIP_DIR="${BASE_DIR}/derivatives/freesurfer"
+SYNTHSTRIP_DIR="${BASE_DIR}/derivatives/synthstrip"
 if [ "$skull_strip_choice" = "2" ]; then
   skull_strip_dir="$SYNTHSTRIP_DIR"
 else
@@ -478,7 +515,7 @@ get_t1_image_path() {
   local ses_label=""
   [ -n "$session" ] && { ses_path="/$session"; ses_label="_${session}"; }
   if [ "$skull_strip_choice" = "2" ]; then
-    t1_image=$(find "${SYNTHSTRIP_DIR}/${subject}${ses_path}/anat" -type f -name "${subject}${ses_label}_*synthstrip*_brain.nii.gz" | head -n 1)
+    t1_image=$(find "${SYNTHSTRIP_DIR}/${subject}${ses_path}/anat" -type f -name "${subject}${ses_label}_desc-brain_T1w.nii.gz" | head -n 1)
   else
     t1_image=$(find "${BET_DIR}/${subject}${ses_path}/anat" -type f -name "${subject}${ses_label}_*_brain.nii.gz" | head -n 1)
   fi
@@ -685,8 +722,22 @@ for subject in "${SUBJECTS_ARRAY[@]}"; do
         [ -n "$slice_timing_file" ] && use_slice_timing=true
       fi
 
+      # Determine expected ICA-AROMA output for checks
+      if [ "$ica_aroma" = true ]; then
+        ica_aroma_output_dir="${BASE_DIR}/${AROMA_PARENT_DIR}/${subject}${ses_path}/func"
+        if [ -n "$task_name" ]; then
+          ica_aroma_output_dir="${ica_aroma_output_dir}/${subject}${ses_label}_task-${task_name}_${run_label}.feat"
+        else
+          ica_aroma_output_dir="${ica_aroma_output_dir}/${subject}${ses_label}_${run_label}.feat"
+        fi
+        expected_denoised="${ica_aroma_output_dir}/denoised_func_data_nonaggr.nii.gz"
+        [ "$apply_nuisance_regression" = true ] && expected_denoised="${ica_aroma_output_dir}/denoised_func_data_nonaggr_nuis.nii.gz"
+      fi
+
       # Build run_feat_analysis.sh command
       cmd="${BASE_DIR}/code/scripts/run_feat_analysis.sh"
+      [ "$design_only" = true ] && cmd+=" --design-only"
+      [ "$keep_full_paths" = true ] && cmd+=" --keep-full-paths"
       if [ "$ica_aroma" = true ]; then
         cmd+=" --preproc-design-file \"$preproc_design_file\""
         cmd+=" --t1-image \"$t1_image\" --func-image \"$func_image\" --template \"$TEMPLATE\" --ica-aroma"
@@ -713,6 +764,11 @@ for subject in "${SUBJECTS_ARRAY[@]}"; do
           eval "$cmd"
         else
           # Preproc + stats
+          skip_stats_design=false
+          if [ "$design_only" = true ] && [ ! -f "$expected_denoised" ]; then
+            echo "Required denoised data $expected_denoised not found. Skipping stats design file."
+            skip_stats_design=true
+          fi
           if [ -n "$task_name" ]; then
             preproc_output_dir="${BASE_DIR}/${PREPROC_PARENT_DIR}/${subject}${ses_path}/func/${subject}${ses_label}_task-${task_name}_${run_label}.feat"
             analysis_output_dir="${BASE_DIR}/${ANALYSIS_POSTICA_PARENT_DIR}/${subject}${ses_path}/func/${subject}${ses_label}_task-${task_name}_${run_label}.feat"
@@ -720,11 +776,14 @@ for subject in "${SUBJECTS_ARRAY[@]}"; do
             preproc_output_dir="${BASE_DIR}/${PREPROC_PARENT_DIR}/${subject}${ses_path}/func/${subject}${ses_label}_${run_label}.feat"
             analysis_output_dir="${BASE_DIR}/${ANALYSIS_POSTICA_PARENT_DIR}/${subject}${ses_path}/func/${subject}${ses_label}_${run_label}.feat"
           fi
-          cmd+=" --preproc-output-dir \"$preproc_output_dir\" --analysis-output-dir \"$analysis_output_dir\""
-          cmd+=" --design-file \"$design_file\""
-          for ((i=0; i<num_evs; i++)); do
-            cmd+=" --ev$((i+1)) \"${EV_TXT_FILES[$i]}\""
-          done
+          cmd+=" --preproc-output-dir \"$preproc_output_dir\""
+          if [ "$skip_stats_design" = false ]; then
+            cmd+=" --analysis-output-dir \"$analysis_output_dir\""
+            cmd+=" --design-file \"$design_file\""
+            for ((i=0; i<num_evs; i++)); do
+              cmd+=" --ev$((i+1)) \"${EV_TXT_FILES[$i]}\""
+            done
+          fi
           echo -e "\n--- FEAT Preprocessing + Main Analysis (ICA-AROMA) ---"
           echo "$cmd"
           eval "$cmd"
@@ -737,6 +796,8 @@ for subject in "${SUBJECTS_ARRAY[@]}"; do
           output_dir="${BASE_DIR}/${ANALYSIS_PARENT_DIR}/${subject}${ses_path}/func/${subject}${ses_label}_${run_label}.feat"
         fi
         cmd+=" --design-file \"$design_file\""
+        [ "$design_only" = true ] && cmd+=" --design-only"
+        [ "$keep_full_paths" = true ] && cmd+=" --keep-full-paths"
         cmd+=" --t1-image \"$t1_image\" --func-image \"$func_image\" --template \"$TEMPLATE\""
         cmd+=" --output-dir \"$output_dir\""
         [ "$use_bbr" = true ] && cmd+=" --use-bbr"

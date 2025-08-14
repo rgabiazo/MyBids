@@ -2,12 +2,19 @@
 # Package defaults for any BIDS+CBRAIN run. When no external config.yaml
 # is supplied, these values are used.
 
+# Default top-level folders referenced across the package.
+# Commands can override these via external configuration files.
+roots:
+  derivatives_root: derivatives
+
 # -------------------------------------------------------------------
 # 1) CBRAIN-specific defaults (only a minimal subset here):
 #    Add additional constants under "cbrain:".
 cbrain:
   hippunfold:
     hippunfold_output_dir: "derivatives/hippunfold"
+  fmriprep:
+    fmriprep_output_dir: "derivatives/fmriprep"
 
 # -------------------------------------------------------------------
 # 2) FSL-related defaults (common derivatives locations):
@@ -51,6 +58,36 @@ dataset_descriptions:
           version: "6.3.0"
           codeURL: "https://github.com/aces/cbrain"
           description: "Used to execute hippunfold."
+
+    fmriprep:
+      name: "fMRIPrep (via CBRAIN)"
+      bids_version: "1.10.0"
+      dataset_type: "derivative"
+      description: "fMRIPrep pipeline output via CBRAIN"
+      generatedby:
+        - name: "fMRIPrep"
+          version: "23.0.2"
+          codeURL: "https://github.com/nipreps/fmriprep"
+          description: "Used for BIDS-compliant fMRI preprocessing."
+        - name: "CBRAIN"
+          version: "6.3.0"
+          codeURL: "https://github.com/aces/cbrain"
+          description: "Used to execute fMRIPrep."
+
+    deepprep:
+      name: "DeepPrep (via CBRAIN)"
+      bids_version: "1.10.0"
+      dataset_type: "derivative"
+      description: "DeepPrep pipeline output via CBRAIN"
+      generatedby:
+        - name: "DeepPrep"
+          version: "24.1.2"
+          codeURL: ""
+          description: "Used for DeepPrep preprocessing."
+        - name: "CBRAIN"
+          version: "6.3.0"
+          codeURL: "https://github.com/aces/cbrain"
+          description: "Used to execute DeepPrep."
 
     # Add defaults for other CBRAIN tools here if required:
     # e.g.

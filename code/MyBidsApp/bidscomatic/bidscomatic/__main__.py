@@ -1,5 +1,4 @@
-"""
-Module entry-point that makes the package runnable with
+"""Module entry point that makes the package runnable.
 
     python -m bidscomatic
     python -m bidscomatic.cli

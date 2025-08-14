@@ -1,12 +1,11 @@
-"""
-Helpers that are shared across multiple pipelines:
+"""Helpers shared across multiple pipelines.
 
 * Subject / session guessing from arbitrary paths.
 * Series enumeration and output-directory helpers.
 * Cheap heuristics to decide whether a folder is a DICOM image series.
 
-All functions are stateless, free of I/O side-effects (apart from simple
-`Path` queries), and therefore easy to unit-test.
+All functions are stateless, free of I/O side effects (apart from simple
+``Path`` queries), and therefore easy to unit test.
 """
 
 from __future__ import annotations

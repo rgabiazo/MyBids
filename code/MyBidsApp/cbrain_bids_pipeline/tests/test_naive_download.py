@@ -47,3 +47,28 @@ def test_naive_download(monkeypatch, tmp_path):
         ),
     ]
     assert sftp.get_calls == expected
+
+
+def test_naive_download_skip_files(monkeypatch, tmp_path):
+    tree = {
+        "/remote/data": ([], ["keep.txt", "ignore.txt"]),
+    }
+
+    def fake_listdirs(_, path):
+        return tree.get(path, ([], []))
+
+    monkeypatch.setattr(download_utils, "list_subdirs_and_files", fake_listdirs)
+
+    sftp = DummySFTP()
+    download_utils.naive_download(
+        sftp=sftp,
+        remote_dir="/remote/data",
+        local_root=str(tmp_path),
+        skip_files=["ignore.txt"],
+    )
+
+    assert (tmp_path / "data" / "keep.txt").exists()
+    assert not (tmp_path / "data" / "ignore.txt").exists()
+    assert sftp.get_calls == [
+        ("/remote/data/keep.txt", str(tmp_path / "data" / "keep.txt"))
+    ]

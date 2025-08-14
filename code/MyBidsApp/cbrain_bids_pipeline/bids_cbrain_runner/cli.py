@@ -1,7 +1,4 @@
-"""
-
-Command-line interface (CLI) entry point for interacting with CBRAIN and
-managing BIDS-formatted datasets.
+"""Command-line interface for CBRAIN and BIDS datasets.
 
 This module defines **only** the CLI front-end; the implementation logic
 lives in dedicated submodules (e.g., ``commands.*``).  Keeping the parsing
@@ -79,6 +76,10 @@ from .commands.tools import (
     list_tool_bourreaus_for_tool,
     list_tool_configs,
     list_tools,
+    error_recover_failed_tasks,
+    error_recover_task,
+    retry_failed_tasks,
+    retry_task,
     show_group_tasks_status,
     show_task_status,
     test_openapi_tools,
@@ -95,6 +96,7 @@ from .commands.userfiles import (
     list_userfiles_by_provider,
     update_userfile_group_and_move,
 )
+from .commands.alias import parse_alias_tokens, run_aliases
 from .utils.cli_utils import parse_kv_pair
 from .utils.progress import run_with_spinner
 
@@ -105,7 +107,9 @@ logger = logging.getLogger(__name__)
 # Public functions
 # ---------------------------------------------------------------------
 def main() -> None:
-    """Entry point for the ``cbrain-cli`` command (also available as ``bids-cbrain-cli``).
+    """Entry point for the ``cbrain-cli`` command.
+
+    Also exposed as ``bids-cbrain-cli``.
 
     The function builds an :class:`argparse.ArgumentParser`, parses the
     command-line flags, performs authentication (token refresh if requested),
@@ -151,7 +155,6 @@ def main() -> None:
         help="Available sub-commands",
     )
 
-
     # -----------------------------------------------------------------
     # Argument groups
     # -----------------------------------------------------------------
@@ -163,6 +166,7 @@ def main() -> None:
     validation_grp = parser.add_argument_group("validation")
     file_reg_grp = parser.add_argument_group("file registration")
     upload_grp = parser.add_argument_group("upload")
+    alias_grp = parser.add_argument_group("alias")
     tool_list_grp = parser.add_argument_group("tool listing")
     tool_launch_grp = parser.add_argument_group("tool launch")
 
@@ -191,8 +195,7 @@ def main() -> None:
         type=float,
         metavar="SEC",
         help=(
-            "HTTP request timeout in seconds. Overrides the CBRAIN_TIMEOUT "
-            "environment variable."
+            "HTTP request timeout in seconds. Overrides the CBRAIN_TIMEOUT " "environment variable."
         ),
     )
 
@@ -336,8 +339,7 @@ def main() -> None:
     sftp_grp.add_argument(
         "--sftp-group-steps",
         nargs="+",
-        help="First arg is <group_id>, subsequent wildcard steps "
-        "(e.g., sub-* ses-* anat).",
+        help="First arg is <group_id>, subsequent wildcard steps " "(e.g., sub-* ses-* anat).",
     )
 
     # -----------------------------------------------------------------
@@ -393,7 +395,7 @@ def main() -> None:
         type=int,
         metavar="USER_ID",
         default=None,
-        help="Admin-only: register files as another user.",
+        help="Admin-only: register files on behalf of another account.",
     )
     file_reg_grp.add_argument(
         "--other-group-id",
@@ -449,8 +451,7 @@ def main() -> None:
     upload_grp.add_argument(
         "--upload-bids-and-sftp-files",
         nargs="*",
-        help="Validate BIDS, compare local vs. remote, "
-        "upload missing files to SFTP.",
+        help="Validate BIDS, compare local vs. remote, " "upload missing files to SFTP.",
     )
     upload_grp.add_argument(
         "--upload-register",
@@ -479,6 +480,38 @@ def main() -> None:
         type=int,
         metavar="PROVIDER_ID",
         help="Move newly registered userfiles to this provider.",
+    )
+
+    # -----------------------------------------------------------------
+    # Alias helpers
+    # -----------------------------------------------------------------
+    alias_grp.add_argument(
+        "--alias",
+        nargs="+",
+        action="append",
+        metavar="STEP",
+        help=(
+            "Create task aliases. Syntax: [<path> ...] OLD=NEW[,sub=ID][,ses=ID]"
+            "[,json=copy|link|skip]"
+        ),
+    )
+    upload_grp.add_argument(
+        "--upload-dry-run",
+        action="store_true",
+        help="Show planned upload actions without transferring files.",
+    )
+    upload_grp.add_argument(
+        "--upload-remote-root",
+        type=str,
+        metavar="DIR",
+        help="Remote base directory for uploads.",
+    )
+    upload_grp.add_argument(
+        "--upload-path-map",
+        action="append",
+        type=parse_kv_pair,
+        metavar="SRC=DEST",
+        help="Replace local suffix SRC with remote DEST during upload.",
     )
 
     # -----------------------------------------------------------------
@@ -590,6 +623,13 @@ def main() -> None:
         metavar="TYPE",
         help="Restrict batch launch to userfiles of this type.",
     )
+    tool_launch_grp.add_argument(
+        "--launch-tool-userfile-ids",
+        dest="launch_tool_userfile_ids",
+        type=str,
+        metavar="ID[,ID...]",
+        help="Comma-separated list of userfile IDs to process in batch mode.",
+    )
 
     # -----------------------------------------------------------------
     # Task status
@@ -598,16 +638,40 @@ def main() -> None:
         "--task-status",
         type=str,
         metavar="IDENT",
-        help=(
-            "Task ID or project name/ID. When a project is given, all its "
-            "tasks are listed."
-        ),
+        help=("Task ID or project name/ID. When a project is given, all its " "tasks are listed."),
     )
     parser.add_argument(
         "--task-type",
         type=str,
         metavar="TYPE",
-        help="Optional tool type filter used with --task-status on a project.",
+        help=(
+            "Optional tool type filter used with --task-status or --retry-failed "
+            "on a project."
+        ),
+    )
+    parser.add_argument(
+        "--retry-task",
+        type=int,
+        metavar="TASK_ID",
+        help="Retry a single failed task by ID.",
+    )
+    parser.add_argument(
+        "--retry-failed",
+        type=str,
+        metavar="GROUP",
+        help="Retry all failed tasks in this project (ID or name).",
+    )
+    parser.add_argument(
+        "--error-recover",
+        type=int,
+        metavar="TASK_ID",
+        help="Trigger error recovery for a single failed or erroring task by ID.",
+    )
+    parser.add_argument(
+        "--error-recover-failed",
+        type=str,
+        metavar="GROUP",
+        help="Recover all failed or erroring tasks in this project (ID or name).",
     )
 
     # -----------------------------------------------------------------
@@ -627,8 +691,11 @@ def main() -> None:
         "--output-type",
         dest="output_type",
         type=str,
-        metavar="TYPE",
-        help="Override the CBRAIN userfile type (if required).",
+        metavar="TYPE[=NAME]",
+        help=(
+            "Override the CBRAIN userfile type and optionally map it to a "
+            "different local directory name (e.g. 'FileCollection=DeepPrep')."
+        ),
     )
     dl.add_argument(
         "--id",
@@ -663,6 +730,12 @@ def main() -> None:
         help="Top-level directories to skip (e.g., config logs).",
     )
     dl.add_argument(
+        "--skip-files",
+        nargs="+",
+        default=[],
+        help="File names to skip (e.g., dataset_description.json).",
+    )
+    dl.add_argument(
         "--force",
         "--force-download",
         dest="force_download",
@@ -674,10 +747,43 @@ def main() -> None:
         action="store_true",
         help="Show actions without writing files.",
     )
+    dl.add_argument(
+        "--download-path-map",
+        dest="download_path_map",
+        action="append",
+        type=parse_kv_pair,
+        default=[],
+        metavar="REMOTE=LOCAL",
+        help=(
+            "Remap a remote directory to a different destination path. "
+            "May be specified multiple times."
+        ),
+    )
+    dl.add_argument(
+        "--normalize",
+        dest="normalize",
+        action="append",
+        choices=["session", "subject"],
+        help=(
+            "Normalise downloaded files; 'session' fixes session labels, "
+            "'subject' inserts subject labels."
+        ),
+    )
+    dl.add_argument(
+        "--alias",
+        nargs="+",
+        action="append",
+        metavar="STEP",
+        help=(
+            "Create task aliases. Syntax: [<path> ...] OLD=NEW[,sub=ID][,ses=ID]"
+            "[,json=copy|link|skip]"
+        ),
+    )
     dl.set_defaults(func=download_tool_outputs)
 
     # Parse command-line arguments
     args = parser.parse_args()
+    alias_specs = [parse_alias_tokens(t) for t in (args.alias or [])]
 
     # Backwards compatibility for deprecated --delete-group-filetype
     if args.delete_group_filetype and not (args.delete_group or args.delete_filetype):
@@ -710,7 +816,7 @@ def main() -> None:
     # Configure root logger after potential --debug-logs flag is known.
     setup_logging(verbose=args.debug_logs)
 
-    # Load SFTP provider, CBRAIN user settings, and tool metadata.
+    # Load SFTP provider, CBRAIN account settings, and tool metadata.
     sftp_cfg: Dict[str, Any] = get_sftp_provider_config(provider_name=args.sftp_provider)
     if (
         args.upload_bids_and_sftp_files
@@ -755,6 +861,9 @@ def main() -> None:
     token: str = auth_cfg["cbrain_api_token"]
     cfg: Dict[str, Any] = {**sftp_cfg, **auth_cfg}
 
+    if alias_specs and args.command != "download":
+        run_aliases(alias_specs)
+
     # -----------------------------------------------------------------
     # Command dispatch (flat flags evaluated in order of appearance
     # in the source file for readability).
@@ -764,18 +873,14 @@ def main() -> None:
         list_data_providers(base_url, token)
 
     if args.browse_provider:
-        listing = browse_provider(
-            base_url, token, args.browse_provider, args.browse_path
-        )
+        listing = browse_provider(base_url, token, args.browse_provider, args.browse_path)
         print(f"Raw listing from provider={args.browse_provider}:")
         for fi in listing:
             print(f" - {fi['name']}  {fi['size']} bytes")
 
     # Group operations
     if args.list_groups:
-        grps = list_groups(
-            base_url, token, per_page=args.per_page, timeout=args.timeout
-        )
+        grps = list_groups(base_url, token, per_page=args.per_page, timeout=args.timeout)
         if not isinstance(grps, list):
             grps = []
         print(f"Found {len(grps)} groups:")
@@ -806,9 +911,7 @@ def main() -> None:
         if gid is None:
             print(f"Group '{args.describe_group_userfiles}' not found")
             sys.exit(1)
-        ufs = describe_group_userfiles(
-            base_url, token, gid, timeout=args.timeout
-        )
+        ufs = describe_group_userfiles(base_url, token, gid, timeout=args.timeout)
         print(f"Found {len(ufs)} userfile(s) in group {gid}:")
         for uf in ufs:
             print(
@@ -827,9 +930,7 @@ def main() -> None:
         )
         if created is None:
             sys.exit(1)
-        print(
-            f"Created group ID={created['id']} name={created['name']}"
-        )
+        print(f"Created group ID={created['id']} name={created['name']}")
 
     # Userfile listing / description
     if args.list_userfiles:
@@ -858,9 +959,7 @@ def main() -> None:
 
         print(f"Found {len(tmp)} userfile(s) on provider {args.list_userfiles_provider}.")
         for uf in tmp:
-            print(
-                f" - ID={uf['id']}  name={uf['name']}  type={uf['type']} group={uf['group_id']}"
-            )
+            print(f" - ID={uf['id']}  name={uf['name']}  type={uf['type']} group={uf['group_id']}")
 
     if args.list_userfiles_group:
         gid = resolve_group_id(
@@ -884,9 +983,7 @@ def main() -> None:
             "Retrieving userfiles",
             show=not args.debug_logs,
         )
-        print(
-            f"Found {len(tmp)} userfile(s) in group {args.list_userfiles_group}."
-        )
+        print(f"Found {len(tmp)} userfile(s) in group {args.list_userfiles_group}.")
         for uf in tmp:
             print(
                 f" - ID={uf['id']}  name={uf['name']}  "
@@ -914,9 +1011,7 @@ def main() -> None:
             "Retrieving userfiles",
             show=not args.debug_logs,
         )
-        print(
-            f"Found {len(tmp)} userfile(s) in group {gid_str} on provider {pid}."
-        )
+        print(f"Found {len(tmp)} userfile(s) in group {gid_str} on provider {pid}.")
         for uf in tmp:
             print(
                 f" - ID={uf['id']}  name={uf['name']}  "
@@ -982,18 +1077,14 @@ def main() -> None:
             group_id = int(args.check_bids_sftp_group[0])
             steps = args.check_bids_sftp_group[1:]
         except (ValueError, IndexError):
-            print("[ERROR] --check-bids-sftp-group requires <group_id> plus "
-                  "wildcard steps.")
+            print("[ERROR] --check-bids-sftp-group requires <group_id> plus " "wildcard steps.")
             sys.exit(1)
-        check_bids_and_sftp_files_with_group(
-            cfg, base_url, token, group_id, steps
-        )
+        check_bids_and_sftp_files_with_group(cfg, base_url, token, group_id, steps)
 
     # Registration / modification helpers
     if args.register_files:
         if not args.dp_id or not args.basenames or not args.filetypes:
-            print("[ERROR] For --register-files, provide --dp-id, --basenames "
-                  "and --filetypes.")
+            print("[ERROR] For --register-files, provide --dp-id, --basenames " "and --filetypes.")
             sys.exit(1)
         if len(args.basenames) != len(args.filetypes):
             print("[ERROR] The number of basenames must match filetypes.")
@@ -1053,6 +1144,7 @@ def main() -> None:
 
     # Upload helper
     if args.upload_bids_and_sftp_files:
+        upload_steps = [s.strip() for s in args.upload_bids_and_sftp_files]
         gid = resolve_group_id(
             base_url,
             token,
@@ -1067,13 +1159,16 @@ def main() -> None:
             cfg,
             base_url,
             token,
-            args.upload_bids_and_sftp_files,
+            upload_steps,
             do_register=args.upload_register,
             dp_id=args.upload_dp_id,
             filetypes=args.upload_filetypes,
             group_id=gid,
             move_provider=args.upload_move_provider,
             timeout=args.timeout,
+            dry_run=args.upload_dry_run,
+            remote_root=args.upload_remote_root,
+            path_map=dict(args.upload_path_map) if args.upload_path_map else None,
         )
 
     # Tool metadata operations
@@ -1135,6 +1230,62 @@ def main() -> None:
                 sys.exit(1)
             show_task_status(base_url, token, tid)
 
+    if args.retry_task:
+        retry_task(
+            base_url,
+            token,
+            args.retry_task,
+            timeout=args.timeout,
+        )
+
+    if args.retry_failed:
+        gid = resolve_group_id(
+            base_url,
+            token,
+            args.retry_failed,
+            per_page=args.per_page,
+            timeout=args.timeout,
+        )
+        if gid is None:
+            print(f"Group '{args.retry_failed}' not found")
+            sys.exit(1)
+        retry_failed_tasks(
+            base_url,
+            token,
+            gid,
+            task_type=args.task_type,
+            per_page=args.per_page,
+            timeout=args.timeout,
+        )
+
+    if args.error_recover:
+        error_recover_task(
+            base_url,
+            token,
+            args.error_recover,
+            timeout=args.timeout,
+        )
+
+    if args.error_recover_failed:
+        gid = resolve_group_id(
+            base_url,
+            token,
+            args.error_recover_failed,
+            per_page=args.per_page,
+            timeout=args.timeout,
+        )
+        if gid is None:
+            print(f"Group '{args.error_recover_failed}' not found")
+            sys.exit(1)
+        error_recover_failed_tasks(
+            base_url,
+            token,
+            gid,
+            task_type=args.task_type,
+            per_page=args.per_page,
+            timeout=args.timeout,
+        )
+
     # Tool launch (single or batch)
     if args.launch_tool:
         extra_params: Dict[str, Any] = dict(args.tool_param or [])
@@ -1153,6 +1304,9 @@ def main() -> None:
             # ``launch_tool_batch_for_group`` emits one log line per user-file.
             # Wrapping it in ``run_with_spinner`` would garble the output, so
             # the helper manages spinners internally for each submission.
+            userfile_ids = None
+            if args.launch_tool_userfile_ids:
+                userfile_ids = [int(x) for x in args.launch_tool_userfile_ids.split(",")]
             launch_tool_batch_for_group(
                 base_url=base_url,
                 token=token,
@@ -1160,6 +1314,7 @@ def main() -> None:
                 tool_name=args.launch_tool,
                 group_id=batch_gid,
                 batch_type=args.launch_tool_batch_type,
+                userfile_ids=userfile_ids,
                 extra_params=extra_params,
                 results_dp_id=args.launch_tool_results_dp_id,
                 bourreau_id=args.launch_tool_bourreau_id,
@@ -1211,21 +1366,39 @@ def main() -> None:
                 if gid is None:
                     print(f"Group '{args.group_id}' not found")
                     sys.exit(1)
+            out_type = args.output_type
+            out_name = None
+            if out_type and "=" in out_type:
+                out_type, out_name = out_type.split("=", 1)
+                if not out_name:
+                    out_name = out_type
+            path_map: dict[str, list[str]] = {}
+            for key, val in args.download_path_map:
+                path_map.setdefault(key, []).append(val)
+            normalize_session = "session" in (args.normalize or [])
+            normalize_subject = "subject" in (args.normalize or [])
             args.func(
                 base_url=base_url,
                 token=token,
                 cfg=full_cfg,
                 tool_name=args.tool,
-                output_type=args.output_type,
+                output_type=out_type,
+                output_dir_name=out_name,
                 userfile_id=args.userfile_id,
                 group_id=gid,
                 flatten=args.flatten,
                 skip_dirs=args.skip_dirs,
+                skip_files=args.skip_files,
+                path_map=path_map,
+                normalize_session=normalize_session,
+                normalize_subject=normalize_subject,
                 dry_run=args.dry_run,
                 force=args.force_download,
                 timeout=args.timeout,
                 show_spinner=not args.debug_logs,
             )
+            if alias_specs:
+                run_aliases(alias_specs, dry_run=args.dry_run)
         except FileNotFoundError as err:
             logger.error(str(err))
             sys.exit(1)

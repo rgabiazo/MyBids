@@ -1,11 +1,9 @@
-"""
-Organises functional BOLD (task and resting-state) NIfTIs found under
-``sourcedata/nifti`` into their final BIDS-compatible ``func/`` folders.
+"""Organise functional BOLD NIfTIs into final BIDS ``func/`` folders.
 
-The module is intentionally **pure**: it only performs file discovery,
-selection, and movement. Heavy lifting such as DICOM → NIfTI conversion,
-BIDS validation, or statistical analysis lives elsewhere. This keeps the
-code easy to unit-test and re-use in notebooks or other pipelines.
+The module is intentionally pure: it only performs file discovery, selection,
+and movement. Heavy lifting such as DICOM → NIfTI conversion, BIDS validation,
+or statistical analysis lives elsewhere. This keeps the code easy to unit test
+and re-use in notebooks or other pipelines.
 
 Key behaviours
 --------------

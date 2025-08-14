@@ -1,4 +1,4 @@
-"""bids_cbrain_runner.commands.download
+"""bids_cbrain_runner.commands.download.
 
 Utilities for downloading CBRAIN-generated derivative folders via SFTP
 into a local BIDS-formatted dataset.
@@ -59,20 +59,25 @@ def download_tool_outputs(
     userfile_id: int | None = None,
     group_id: int | None = None,
     *,
+    output_dir_name: str | None = None,
     flatten: bool = True,
     skip_dirs: Sequence[str] | None = None,
+    skip_files: Sequence[str] | None = None,
+    path_map: Mapping[str, Sequence[str]] | None = None,
+    normalize_session: bool = False,
+    normalize_subject: bool = False,
     dry_run: bool = False,
     force: bool = False,
     timeout: float | None = None,
     show_spinner: bool = True,
 ) -> None:
-    """Download outputs of a *CBRAIN* tool into the local BIDS derivatives tree.
+    """Download outputs of a CBRAIN tool into the local BIDS derivatives tree.
 
     The helper locates all *Userfiles* that belong to *tool_name* (filtered
-    either by *userfile_id* or by *group_id*), opens an SFTP session with the
-    data-provider defined in *cfg*, and transfers each matching folder into
-    ``<BIDS_ROOT>/derivatives/<tool_name>`` (or an override specified in the
-    project YAML).
+        either by *userfile_id* or by *group_id*), opens an SFTP session with the
+        data-provider defined in *cfg*, and transfers each matching folder into
+        ``<BIDS_ROOT>/derivatives/<tool_name>`` (or an override specified in the
+        project YAML).
 
     Args:
         base_url: Full CBRAIN portal URL (no trailing slash).
@@ -86,12 +91,23 @@ def download_tool_outputs(
         group_id: Download **all** matching userfiles that belong to the
             specified **project** (*Group*).  Ignored when *userfile_id* is
             given.
+        output_dir_name: Optional override for the top-level destination
+            directory.  Defaults to *output_type* when provided or *tool_name*
+            otherwise.
         flatten: When *True*, strip the extra wrapper directory commonly used
             by CBRAIN pipelines so that outputs land directly under the
             subject/session hierarchy.
         skip_dirs: Additional directory names to ignore during the transfer
             (merged with any ``skip_dirs`` declared for *tool_name* in
             ``tools.yaml``).
+        skip_files: Filenames to ignore during the transfer (merged with any
+            ``skip_files`` declared for *tool_name* in ``tools.yaml``).
+        path_map: Mapping of directory names to alternative destination paths
+            relative to their parent directory.
+        normalize_session: When *True*, ensure filenames include the session
+            label matching their directory.
+        normalize_subject: When *True*, ensure filenames include the subject
+            label matching their directory.
         dry_run: Print the planned transfer operations without touching the
             network or filesystem.
         force: Overwrite existing local files when *True*.
@@ -106,6 +122,7 @@ def download_tool_outputs(
         None.  Progress and diagnostics are emitted via :pymod:`logging`.
     """
     skip_dirs = list(skip_dirs or [])  # ensure mutability
+    skip_files = list(skip_files or [])
 
     # ------------------------------------------------------------------#
     # 1) Determine the expected CBRAIN *type* for this tool              #
@@ -187,11 +204,12 @@ def download_tool_outputs(
         raise FileNotFoundError("Could not locate dataset_description.json.")
 
     pipeline_cfg = load_pipeline_config()
-
+    local_name = output_dir_name or output_type or tool_name
     outdir = resolve_output_dir(
         bids_root=bids_root,
         tool_name=tool_name,
         config_dict=pipeline_cfg,
+        output_dir_name=local_name,
         force=force,
         dry_run=dry_run,
     )
@@ -217,7 +235,10 @@ def download_tool_outputs(
     tool_conf = tools_cfg.get(tool_name, {})
     cfg_skip: Sequence[str] = tool_conf.get("skip_dirs", [])
     cfg_keep: Sequence[str] = tool_conf.get("keep_dirs", [])
+    cfg_skip_files: Sequence[str] = tool_conf.get("skip_files", [])
+    cfg_subject: Sequence[str] = tool_conf.get("subject_dirs", [])
     final_skip = list(set(cfg_skip).union(skip_dirs))
+    final_skip_files = list(set(cfg_skip_files).union(skip_files))
 
     # ------------------------------------------------------------------#
     # 6) Transfer each userfile                                          #
@@ -225,11 +246,12 @@ def download_tool_outputs(
     for uf in userfiles:
         remote_root = f"/{uf['name']}"
         logger.info(
-            "Downloading %s → %s  (flatten=%s, skip_dirs=%s, dry_run=%s, force=%s)",
+            "Downloading %s → %s  (flatten=%s, skip_dirs=%s, skip_files=%s, dry_run=%s, force=%s)",
             remote_root,
             outdir,
             flatten,
             final_skip,
+            final_skip_files,
             dry_run,
             force,
         )
@@ -242,7 +264,12 @@ def download_tool_outputs(
                 tool_name=tool_name,
                 skip_dirs=final_skip,
                 keep_dirs=cfg_keep,
-                wrapper=tool_name,
+                subject_dirs=cfg_subject,
+                skip_files=final_skip_files,
+                wrapper=local_name,
+                path_map=path_map,
+                normalize_session=normalize_session,
+                normalize_subject=normalize_subject,
                 dry_run=dry_run,
                 force=force,
             )
@@ -252,6 +279,10 @@ def download_tool_outputs(
                 remote_dir=remote_root,
                 local_root=outdir,
                 skip_dirs=final_skip,
+                skip_files=final_skip_files,
+                path_map=path_map,
+                normalize_session=normalize_session,
+                normalize_subject=normalize_subject,
                 dry_run=dry_run,
                 force=force,
             )

@@ -1,5 +1,4 @@
-"""
-Typed façade around the auto-generated *openapi_client* package.
+"""Typed façade around the auto-generated *openapi_client* package.
 
 The generated client (under :pyfile:`api/cbrain_openapi/`) is convenient but
 exposes thousands of untyped attributes and requires a non-trivial amount of
@@ -57,28 +56,53 @@ try:  # Actual OpenAPI models may be unavailable during tests
     from openapi_client.models.multi_userfiles_mod_req import (
         MultiUserfilesModReq,
     )
+    from openapi_client.models.batch_task_mod_req import BatchTaskModReq
 except Exception:  # pragma: no cover - simplified stubs for unit tests
     class Group:
+        """Lightweight stand-in for the OpenAPI ``Group`` model."""
+
         def __init__(self, **kwargs):
+            """Store provided attributes without validation."""
             for k, v in kwargs.items():
                 setattr(self, k, v)
 
         def to_dict(self) -> dict:
+            """Return a dictionary representation of the instance."""
             return self.__dict__
 
     class GroupModReq:
+        """Request payload for group modifications."""
+
         def __init__(self, group=None):
+            """Initialize with an optional group value."""
             self.group = group
 
         def to_dict(self) -> dict:
+            """Return a dictionary suitable for API calls."""
             return {"group": self.group}
 
     class MultiUserfilesModReq:
+        """Request payload for multi-userfile operations."""
+
         def __init__(self, file_ids=None):
+            """Initialize with an optional list of file identifiers."""
             self.file_ids = file_ids
 
         def to_dict(self) -> dict:
+            """Return a dictionary representation for the API."""
             return {"file_ids": self.file_ids}
+
+    class BatchTaskModReq:
+        """Request payload for multi-task operations."""
+
+        def __init__(self, tasklist=None, batch_ids=None):
+            """Initialize with optional task and batch identifiers."""
+            self.tasklist = tasklist
+            self.batch_ids = batch_ids
+
+        def to_dict(self) -> dict:
+            """Return a dictionary representation for the API."""
+            return {"tasklist": self.tasklist, "batch_ids": self.batch_ids}
 
 # Low-level fallback helpers (pure ``requests``)
 from .client import cbrain_get, cbrain_delete
@@ -107,31 +131,25 @@ def get_api_client(base_url: str, token: str) -> ApiClient:
 
 
 class CbrainClient:
-    """Typed façade that groups together the small subset of CBRAIN endpoints.
+    """Typed façade exposing a subset of CBRAIN endpoints.
 
-    The class does **not** expose every OpenAPI operation.  Only calls used by
-    the CLI are wrapped; new helpers can be added incrementally as needed.
+    Only the calls required by the CLI are wrapped. New helpers can be added as
+    needed.
 
-    Attributes
-    ----------
-    base_url
-        Portal root URL (without trailing slash).
-    token
-        ``cbrain_api_token`` supplied in every request.
-    tools_api
-        Instance of :class:`openapi_client.ToolsApi`.
-    toolconfigs_api
-        Instance of :class:`openapi_client.ToolConfigsApi`.
-    bourreaux_api
-        Instance of :class:`openapi_client.BourreauxApi`.
-    tasks_api
-        Instance of :class:`openapi_client.TasksApi`.
+    Attributes:
+        base_url: Portal root URL without a trailing slash.
+        token: ``cbrain_api_token`` supplied in every request.
+        tools_api: Instance of :class:`openapi_client.ToolsApi`.
+        toolconfigs_api: Instance of :class:`openapi_client.ToolConfigsApi`.
+        bourreaux_api: Instance of :class:`openapi_client.BourreauxApi`.
+        tasks_api: Instance of :class:`openapi_client.TasksApi`.
     """
 
     # ------------------------------------------------------------------
     # Construction helpers
     # ------------------------------------------------------------------
     def __init__(self, base_url: str, token: str) -> None:
+        """Initialise the client with a base URL and API token."""
         self.base_url = base_url.rstrip("/")
         self.token = token
 
@@ -317,6 +335,40 @@ class CbrainClient:
         if resp.status_code not in (200, 302):
             resp.raise_for_status()
 
+    def operate_tasks(
+        self,
+        operation: str,
+        task_ids: List[int],
+        *,
+        timeout: float | None = None,
+    ) -> object:
+        """Apply *operation* to the tasks identified by *task_ids*.
+
+        Args:
+            operation: One of the operations supported by the
+                ``/tasks/operation`` endpoint (e.g. ``"delete"``,
+                ``"restart_cluster"``).
+            task_ids: Iterable of task identifiers to operate on.
+            timeout: Optional request timeout forwarded to the API client.
+
+        Returns:
+            The raw object returned by the underlying OpenAPI call.
+
+        Raises:
+            CbrainTaskError: If the API call fails.
+        """
+        body = BatchTaskModReq(tasklist=[int(t) for t in task_ids])
+        try:
+            return self.tasks_api.tasks_operation_post(
+                operation=operation,
+                tasklist=body,
+                _request_timeout=timeout,
+            )
+        except ApiException as exc:  # pragma: no cover - network failure
+            raise CbrainTaskError(
+                f"Could not apply operation '{operation}' to tasks {task_ids}: {exc}"
+            ) from exc
+
     # ------------------------------------------------------------------
     # Convenience helpers that combine multiple API calls
     # ------------------------------------------------------------------
@@ -351,11 +403,11 @@ class CbrainClient:
     def list_tool_bourreaus_for_tool(
         self, tool_name: str, *, per_page: int = 500
     ) -> List[Tuple[int, int]]:
-        """Return ``(tool_config_id, bourreau_id)`` pairs for a given *tool_name*.
+        """Return ``(tool_config_id, bourreau_id)`` pairs for *tool_name*.
 
         Args:
             tool_name: Exact (case-insensitive) tool name as reported by CBRAIN.
-            per_page:  Maximum items per page when querying ``/tool_configs``.
+            per_page: Maximum items per page when querying ``/tool_configs``.
 
         Returns:
             List of tuples linking configuration IDs to bourreau IDs.

@@ -128,7 +128,6 @@ class Sequence(BaseModel):
 
 
 class IgnoreSection(BaseModel):
-
     """Patterns defining which archives and files to ignore.
 
     Attributes:

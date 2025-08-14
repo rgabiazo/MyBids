@@ -1,1 +1,4 @@
-from .. import __version__ 
+"""Helpers for initialising the API subpackage."""
+
+from .. import __version__
+

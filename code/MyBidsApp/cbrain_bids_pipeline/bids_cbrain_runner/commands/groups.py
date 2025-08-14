@@ -1,5 +1,4 @@
-"""
-Helpers for interacting with CBRAIN *groups* (projects).
+"""Helpers for interacting with CBRAIN *groups* (projects).
 
 The helpers now rely on :class:`bids_cbrain_runner.api.client_openapi.CbrainClient`
 to perform OpenAPI requests.  Output is still returned as plain Python
@@ -149,7 +148,6 @@ def create_group(
         The JSON object describing the newly created group on success, or
         ``None`` if creation failed or the name already exists.
     """
-
     if not _VALID_NAME_RE.match(name):
         logger.error("Invalid group name '%s'", name)
         return None
@@ -201,7 +199,6 @@ def find_group_id_by_name(
     The helper iterates through ``/groups`` pages until the requested name is
     found or the end of the listing is reached.
     """
-
     page = 1
     while True:
         groups = list_groups(
@@ -226,7 +223,6 @@ def resolve_group_id(
     timeout: float | None = None,
 ) -> int | None:
     """Coerce ``identifier`` (ID or name) to a numeric group ID."""
-
     if identifier is None:
         return None
 

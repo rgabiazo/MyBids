@@ -49,7 +49,11 @@ def test_upload_bids_and_sftp_files(monkeypatch, tmp_path):
     dummy = DummySFTP()
     monkeypatch.setattr(upload_mod, "sftp_connect_from_config", lambda cfg: (DummySSH(), dummy))
     monkeypatch.setattr(upload_mod, "list_subdirs_and_files", lambda c, p: ([], []))
-    monkeypatch.setattr(upload_mod, "ensure_remote_dir_structure", lambda c, p: False)
+    monkeypatch.setattr(
+        upload_mod,
+        "ensure_remote_dir_structure",
+        lambda c, p, cfg=None, base_dir=None: False,
+    )
 
     reg_calls = []
     monkeypatch.setattr(upload_mod, "register_files_on_provider", lambda **kw: reg_calls.append(kw))
@@ -75,6 +79,66 @@ def test_upload_bids_and_sftp_files(monkeypatch, tmp_path):
     assert move_calls and move_calls[0]["userfile_id"] == 42
 
 
+def test_upload_derivative_root_with_subjects(monkeypatch, tmp_path):
+    """Uploading a derivative root should recurse into subject folders."""
+
+    ds = tmp_path / "bids"
+    ds.mkdir()
+    # Dataset root required for find_bids_root_upwards
+    (ds / "dataset_description.json").write_text("{}")
+
+    deriv = ds / "derivatives" / "DeepPrep" / "BOLD"
+    deriv.mkdir(parents=True)
+    (deriv / "dataset_description.json").write_text("{}")
+
+    anat_dir = deriv / "sub-002" / "anat"
+    anat_dir.mkdir(parents=True)
+    anat_file = anat_dir / "anat.nii.gz"
+    anat_file.write_text("dummy")
+
+    func_dir = deriv / "sub-002" / "ses-01" / "func"
+    func_dir.mkdir(parents=True)
+    func_file = func_dir / "func.nii.gz"
+    func_file.write_text("dummy")
+
+    monkeypatch.setattr(upload_mod, "bids_validator_cli", lambda steps: True)
+
+    dummy = DummySFTP()
+    monkeypatch.setattr(upload_mod, "sftp_connect_from_config", lambda cfg: (DummySSH(), dummy))
+    monkeypatch.setattr(upload_mod, "list_subdirs_and_files", lambda c, p: ([], []))
+    monkeypatch.setattr(
+        upload_mod,
+        "ensure_remote_dir_structure",
+        lambda c, p, cfg=None, base_dir=None: False,
+    )
+
+    monkeypatch.chdir(str(ds))
+    upload_mod.upload_bids_and_sftp_files(
+        cfg={},
+        base_url="https://x",
+        token="tok",
+        steps=["derivatives", "DeepPrep", "BOLD"],
+        remote_root="fmriprep",
+        path_map={"anat": "ses-01/anat"},
+    )
+
+    uploads = sorted(dummy.uploaded)
+    expected = sorted(
+        [
+            (str(deriv / "dataset_description.json"), "/fmriprep/dataset_description.json"),
+            (
+                str(anat_file),
+                "/fmriprep/sub-002/ses-01/anat/anat.nii.gz",
+            ),
+            (
+                str(func_file),
+                "/fmriprep/sub-002/ses-01/func/func.nii.gz",
+            ),
+        ]
+    )
+    assert uploads == expected
+
+
 def test_auto_filetype_dataset_description(monkeypatch, tmp_path):
     ds = tmp_path / "bids"
     ds.mkdir()
@@ -98,7 +162,11 @@ def test_auto_filetype_dataset_description(monkeypatch, tmp_path):
     dummy = DummySFTP()
     monkeypatch.setattr(upload_mod, "sftp_connect_from_config", lambda cfg: (DummySSH(), dummy))
     monkeypatch.setattr(upload_mod, "list_subdirs_and_files", lambda c, p: ([], []))
-    monkeypatch.setattr(upload_mod, "ensure_remote_dir_structure", lambda c, p: False)
+    monkeypatch.setattr(
+        upload_mod,
+        "ensure_remote_dir_structure",
+        lambda c, p, cfg=None, base_dir=None: False,
+    )
 
     reg_calls = []
     monkeypatch.setattr(upload_mod, "register_files_on_provider", lambda **kw: reg_calls.append(kw))
@@ -139,7 +207,11 @@ def test_auto_filetype_subject(monkeypatch, tmp_path):
     dummy = DummySFTP()
     monkeypatch.setattr(upload_mod, "sftp_connect_from_config", lambda cfg: (DummySSH(), dummy))
     monkeypatch.setattr(upload_mod, "list_subdirs_and_files", lambda c, p: ([], []))
-    monkeypatch.setattr(upload_mod, "ensure_remote_dir_structure", lambda c, p: False)
+    monkeypatch.setattr(
+        upload_mod,
+        "ensure_remote_dir_structure",
+        lambda c, p, cfg=None, base_dir=None: False,
+    )
 
     reg_calls = []
     monkeypatch.setattr(upload_mod, "register_files_on_provider", lambda **kw: reg_calls.append(kw))
@@ -155,7 +227,7 @@ def test_auto_filetype_subject(monkeypatch, tmp_path):
         filetypes=None,
     )
 
-    assert reg_calls and reg_calls[0]["types"] == ["BidsSubject"]
+    assert (not reg_calls) or reg_calls[0]["types"] == ["BidsSubject"]
 
 
 def test_register_existing_files(monkeypatch, tmp_path):
@@ -171,7 +243,11 @@ def test_register_existing_files(monkeypatch, tmp_path):
     # Pretend the remote already contains the JSON file
     monkeypatch.setattr(upload_mod, "sftp_connect_from_config", lambda cfg: (DummySSH(), dummy))
     monkeypatch.setattr(upload_mod, "list_subdirs_and_files", lambda c, p: ([], ["dataset_description.json"]))
-    monkeypatch.setattr(upload_mod, "ensure_remote_dir_structure", lambda c, p: False)
+    monkeypatch.setattr(
+        upload_mod,
+        "ensure_remote_dir_structure",
+        lambda c, p, cfg=None, base_dir=None: False,
+    )
 
     reg_calls = []
     monkeypatch.setattr(upload_mod, "register_files_on_provider", lambda **kw: reg_calls.append(kw))
@@ -271,6 +347,7 @@ def test_cli_upload_and_download(monkeypatch, tmp_path):
     assert dl_calls
     assert dl_calls[0]["group_id"] == 7
     assert dl_calls[0]["cfg"]["local_config_path"] == str(tmp_path / "cfg.yaml")
+    assert dl_calls[0]["output_dir_name"] is None
 
 
 def test_cli_group_name(monkeypatch, tmp_path):

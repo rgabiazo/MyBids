@@ -1,9 +1,7 @@
-"""
-Move anatomical NIfTIs (and their JSON side-cars) from *sourcedata/nifti* into
-``sub-*/[ses-*/]anat/`` following the mapping defined in *series.yaml*.
+"""Move anatomical NIfTIs from *sourcedata/nifti* into ``sub-*/[ses-*/]anat/``.
 
 Key points
------------
+----------
 * Keeps cross-pipeline consistency by delegating common ranking logic to
   :func:`bidscomatic.pipelines._selection.best_runs`.
 * Restores the original anatomical tie-break so the file with the highest

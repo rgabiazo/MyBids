@@ -1,12 +1,6 @@
-"""
-Module-level wrapper so that executing
+"""Module wrapper so running ``python -m bidscomatic.cli`` matches the console script.
 
-    python -m bidscomatic.cli …
-
-behaves identically to invoking the console script **bidscomatic-cli** that is
-declared in *pyproject.toml*.
-
-The file contains no additional logic beyond importing the Click *group* and
+The file contains no additional logic beyond importing the Click group and
 calling it when executed as a script.
 """
 

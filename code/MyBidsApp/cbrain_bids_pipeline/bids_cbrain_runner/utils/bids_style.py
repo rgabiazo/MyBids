@@ -1,8 +1,9 @@
-"""
-Utility for converting a directory tree representation—such as the
-structure produced by *local_files.local_build_path_tree()* or
-*sftp.build_sftp_path_tree()*—into a JSON‑serialisable mapping that
-resembles a typical BIDS derivative folder layout.
+"""Convert a directory tree to a BIDS-style mapping.
+
+Utility functions convert the structure produced by
+``local_files.local_build_path_tree()`` or ``sftp.build_sftp_path_tree()``
+into a JSON serialisable mapping that mirrors a typical BIDS derivative
+layout.
 
 The expected *node* structure mirrors the output of the aforementioned
 helpers:
@@ -29,26 +30,25 @@ Args:
     node (dict): Mapping that follows the structure shown above.
 
 Returns:
-    dict | list[str]: A BIDS‑style representation of *node*. If *node*
-    has no sub‑directories, the return value is the sorted list of its
-    files. Otherwise the return value is a dictionary that may include a
-    ``"files"`` key when the directory contains direct files in addition
-    to sub‑directories.
+    dict | list[str]: A BIDS-style representation of ``node``. If
+    ``node`` has no sub-directories, the return value is the sorted list of
+    its files. Otherwise the return value is a dictionary that may include a
+    ``"files"`` key when the directory contains direct files in addition to
+    sub-directories.
 """
 
 def to_bids_style(node):
-    """Recursively convert *node* into a BIDS‑style representation.
+    """Recursively convert ``node`` into a BIDS-style representation.
 
     Args:
-        node (dict): Directory mapping produced by the path‑tree
-            builders. It must contain the helper keys ``"_files"`` and
-            ``"_subdirs"`` alongside any nested sub‑directory keys.
+        node (dict): Directory mapping produced by the path-tree builders. It
+            must contain the helper keys ``"_files"`` and ``"_subdirs"`` alongside
+            any nested sub-directory keys.
 
     Returns:
-        dict | list[str]: See module‑level docstring for details.
+        dict | list[str]: See module-level docstring for details.
     """
-
-    # Helper lists are retrieved once to avoid repeated look‑ups.
+    # Helper lists are retrieved once to avoid repeated look-ups.
     raw_files = node.get("_files", [])
     raw_subdirs = node.get("_subdirs", [])
 

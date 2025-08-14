@@ -1,5 +1,4 @@
-"""
-Configuration file loaders and helpers.
+"""Configuration file loaders and helpers.
 
 This module centralises logic for reading *YAML* configuration files that
 control CBRAIN-BIDS pipelines.  Three independent domains are covered:
@@ -7,7 +6,7 @@ control CBRAIN-BIDS pipelines.  Three independent domains are covered:
 1. **CBRAIN credentials and session parameters** – ``load_cbrain_config``
 2. **Infrastructure metadata** (*servers*, *tools*) – ``load_servers_config``,
    ``get_sftp_provider_config``, ``load_tools_config``
-3. **Pipeline defaults and user overrides** – ``load_pipeline_config``
+3. **Pipeline defaults and override files** – ``load_pipeline_config``
 
 Each loader returns plain ``dict`` objects so that calling code can remain
 framework-agnostic.  All YAML parsing uses :pymod:`yaml.safe_load` to
@@ -161,20 +160,15 @@ def get_sftp_provider_config(provider_name: str = "sftp_1") -> Dict[str, Any]:
 
 
 def get_sftp_provider_config_by_id(provider_id: int) -> Dict[str, Any]:
-    """Return SFTP credentials for a provider identified by ``cbrain_id``.
+    """Return SFTP credentials for a provider by ``cbrain_id``.
 
-    Parameters
-    ----------
-    provider_id
-        Numeric ``cbrain_id`` associated with the provider in ``servers.yaml``.
+    Args:
+        provider_id: Numeric ``cbrain_id`` listed in ``servers.yaml``.
 
-    Returns
-    -------
-    dict
-        Provider configuration merged with the global ``cbrain_base_url``.
-        Empty when no matching entry exists.
+    Returns:
+        Dictionary merged with the global ``cbrain_base_url``. Returns an empty
+        mapping when no matching entry exists.
     """
-
     servers = load_servers_config()
     cfg: Dict[str, Any] = {}
 
@@ -226,7 +220,9 @@ def load_pipeline_config() -> Dict[str, Any]:
 
     Returns:
         Combined configuration dictionary.  When no BIDS root is detected or
-        the override file is absent, the defaults are returned verbatim.
+        the override file is absent, the defaults are returned verbatim.  The
+        resulting mapping always exposes ``roots["derivatives_root"]`` as well
+        as a top-level ``derivatives_root`` entry for backward compatibility.
     """
     merged: Dict[str, Any] = {}
 
@@ -267,6 +263,17 @@ def load_pipeline_config() -> Dict[str, Any]:
             logger.error("Failed to merge override %s: %s", override_path, exc)
     else:
         logger.info("No external config found at %s; using defaults only", override_path)
+
+    # ------------------------------------------------------------------ #
+    # 3. expose both roots["derivatives_root"] and top-level key         #
+    # ------------------------------------------------------------------ #
+    deriv_root = (
+        merged.get("roots", {}).get("derivatives_root")
+        or merged.get("derivatives_root")
+        or "derivatives"
+    )
+    merged.setdefault("roots", {})["derivatives_root"] = deriv_root
+    merged["derivatives_root"] = deriv_root
 
     return merged
 

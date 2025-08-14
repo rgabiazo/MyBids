@@ -71,10 +71,7 @@ class SubjectID(str):
 
 
 class SessionID(str):
-    """
-    Typed alias that guarantees either a valid ``ses-YYY`` string **or**
-    ``None`` when sessions are absent.
-    """
+    """Typed alias representing a ``ses-YYY`` identifier or ``None``."""
 
     @classmethod
     def __get_validators__(cls):
@@ -144,16 +141,14 @@ class BIDSPath(BaseModel, frozen=True):
 
     @staticmethod
     def _ensure_prefix(value: str, prefix: str) -> str:
-        """
-        Return *value* with *prefix* prepended unless the value is already
-        prefixed or still contains an unresolved placeholder.
+        """Return value with prefix unless already present or unresolved.
 
         Args:
             value: The raw entity string.
             prefix: Prefix string such as ``"sub-"`` or ``"ses-"``.
 
         Returns:
-            The possibly modified *value*. No mutation occurs when *value*
+            The possibly modified value. No mutation occurs when *value*
             already starts with *prefix* or begins with ``"{"``.
         """
         if not value or value.startswith(prefix) or value.startswith("{"):
@@ -293,12 +288,10 @@ def build_scan_plans(
     *,
     task: str | None = None,
 ) -> Iterable["ScanPlan"]:
-    """
-    Generate an iterable of :class:`ScanPlan` objects for a single
-    *subject/session* combination.
+    """Generate ScanPlan objects for one subject/session combination.
 
-    This helper leaves **placeholder resolution** to the caller; *entities*
-    must be fully rendered prior to use.
+    This helper leaves placeholder resolution to the caller; entities must be
+    fully rendered prior to use.
 
     Args:
         cfg_modalities: The ``modalities`` mapping from

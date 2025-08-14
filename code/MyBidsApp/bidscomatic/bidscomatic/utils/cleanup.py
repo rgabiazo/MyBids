@@ -1,9 +1,7 @@
-"""
-Utility helpers for removing study archives and accompanying DICOM
-folders.
+"""Utility helpers for removing study archives and accompanying DICOM folders.
 
-The helpers in this module perform **destructive** filesystem operations only
-(pure deletion) and do not touch any other external state. Doing so keeps the
+The helpers perform destructive filesystem operations only (pure deletion)
+and do not touch any other external state. Doing so keeps the
 functions trivial to test: unit-tests simply create temporary files / folders,
 invoke the helpers, and assert on the filesystem afterwards.
 

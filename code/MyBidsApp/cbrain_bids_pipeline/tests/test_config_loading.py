@@ -19,9 +19,13 @@ LOG = logging.getLogger(__name__)
 def write_minimal_defaults(tmpdir):
     """Create a minimal defaults.yaml inside a fake package install."""
     cfg = {
+        "roots": {"derivatives_root": "derivatives"},
         "cbrain": {
             "hippunfold": {
                 "hippunfold_output_dir": "derivatives/custom_hippunfold"
+            },
+            "fmriprep": {
+                "fmriprep_output_dir": "derivatives/custom_fmriprep"
             }
         },
         "dataset_descriptions": {
@@ -45,6 +49,26 @@ def write_minimal_defaults(tmpdir):
                             "description": "Used to execute hippunfold."
                         }
                     ]
+                },
+                "fmriprep": {
+                    "name": "Default fMRIPrep Name",
+                    "bids_version": "1.10.0",
+                    "dataset_type": "derivative",
+                    "description": "Default description",
+                    "generatedby": [
+                        {
+                            "name": "fMRIPrep",
+                            "version": "23.0.2",
+                            "codeURL": "https://github.com/nipreps/fmriprep",
+                            "description": "Used for BIDS-compliant fMRI preprocessing."
+                        },
+                        {
+                            "name": "CBRAIN",
+                            "version": "6.3.0",
+                            "codeURL": "https://github.com/aces/cbrain",
+                            "description": "Used to execute fMRIPrep."
+                        }
+                    ]
                 }
             }
         }
@@ -61,12 +85,19 @@ def write_external_override(tmproot):
         "cbrain": {
             "hippunfold": {
                 "hippunfold_output_dir": "derivatives/custom_hippunfold"
+            },
+            "fmriprep": {
+                "fmriprep_output_dir": "derivatives/custom_fmriprep"
             }
         },
         "dataset_descriptions": {
             "cbrain": {
                 "hippunfold": {
                     "name": "Overridden Hippunfold Name",
+                    "description": "This came from the external override."
+                },
+                "fmriprep": {
+                    "name": "Overridden fMRIPrep Name",
                     "description": "This came from the external override."
                 }
             }
@@ -93,11 +124,11 @@ def test_pipeline_config_and_description(tmp_path, monkeypatch, caplog):
     # Capture INFO-level logs
     caplog.set_level(logging.INFO)
 
-    # 1) Fake the “installed” package by copying in our own minimal defaults.yaml
+    # 1) Fake the “installed” package by copying in a minimal defaults.yaml
     pkg_root = tmp_path / "fake_install"
     write_minimal_defaults(str(pkg_root))
 
-    # Monkey-patch PYTHONPATH so that imports find our fake install first
+    # Monkey-patch PYTHONPATH so that imports find the fake install first
     monkeypatch.setenv("PYTHONPATH", str(pkg_root) + os.pathsep + os.environ.get("PYTHONPATH", ""))
     monkeypatch.chdir(str(pkg_root))
 
@@ -115,19 +146,26 @@ def test_pipeline_config_and_description(tmp_path, monkeypatch, caplog):
     monkeypatch.chdir(str(bids_test))
     cfg = load_pipeline_config()
 
-    # Verify that our override was merged
+    assert cfg["derivatives_root"] == "derivatives"
+    assert cfg.get("roots", {}).get("derivatives_root") == "derivatives"
+
+    # Verify that the override was merged
     assert "cbrain" in cfg
     assert "hippunfold" in cfg["cbrain"]
+    assert "fmriprep" in cfg["cbrain"]
 
-    # 5) Now test resolve_output_dir + maybe_write_dataset_description
+    # 5) Now test resolve_output_dir + maybe_write_dataset_description for both tools
     outdir = resolve_output_dir(str(bids_test), "hippunfold", cfg)
     assert outdir.endswith("derivatives/custom_hippunfold")
+    outdir_fmriprep = resolve_output_dir(str(bids_test), "fmriprep", cfg)
+    assert outdir_fmriprep.endswith("derivatives/custom_fmriprep")
 
-    # 6) Write dataset_description.json into the new output folder:
+    # 6) Write dataset_description.json into the new output folder for both
     maybe_write_dataset_description(outdir, "hippunfold", cfg, dry_run=False)
+    maybe_write_dataset_description(outdir_fmriprep, "fmriprep", cfg, dry_run=False)
 
     desc_file = os.path.join(outdir, "dataset_description.json")
-    assert os.path.exists(desc_file), "dataset_description.json should have been created"
+    assert os.path.exists(desc_file)
     with open(desc_file, "r", encoding="utf-8") as f:
         dd = json.load(f)
     assert dd["Name"] == "Overridden Hippunfold Name"
@@ -135,3 +173,49 @@ def test_pipeline_config_and_description(tmp_path, monkeypatch, caplog):
         g.get("Name") == "cbrain_bids_pipeline" and g.get("Version") == __version__
         for g in dd.get("GeneratedBy", [])
     )
+    desc_file2 = os.path.join(outdir_fmriprep, "dataset_description.json")
+    assert os.path.exists(desc_file2)
+    with open(desc_file2, "r", encoding="utf-8") as f:
+        dd2 = json.load(f)
+    assert dd2["Name"] == "Overridden fMRIPrep Name"
+    assert any(
+        g.get("Name") == "cbrain_bids_pipeline" and g.get("Version") == __version__
+        for g in dd2.get("GeneratedBy", [])
+    )
+
+
+def test_maybe_write_dataset_description_deepprep(tmp_path, monkeypatch):
+    """maybe_write_dataset_description handles deepprep metadata."""
+
+    cfg = {
+        "dataset_descriptions": {
+            "cbrain": {
+                "deepprep": {
+                    "name": "DeepPrep (via CBRAIN)",
+                    "bids_version": "1.10.0",
+                    "dataset_type": "derivative",
+                    "description": "DeepPrep pipeline output via CBRAIN",
+                    "generatedby": [
+                        {
+                            "name": "DeepPrep",
+                            "version": "24.1.2",
+                            "codeURL": "",
+                            "description": "Used for DeepPrep preprocessing.",
+                        },
+                        {
+                            "name": "CBRAIN",
+                            "version": "6.3.0",
+                            "codeURL": "https://github.com/aces/cbrain",
+                            "description": "Used to execute DeepPrep.",
+                        },
+                    ],
+                }
+            }
+        }
+    }
+
+    outdir = tmp_path / "deepprep"
+    outdir.mkdir()
+    maybe_write_dataset_description(str(outdir), "deepprep", cfg, dry_run=False)
+
+    assert (outdir / "dataset_description.json").exists()

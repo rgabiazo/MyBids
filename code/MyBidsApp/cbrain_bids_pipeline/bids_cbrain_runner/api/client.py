@@ -1,5 +1,4 @@
-"""
-Light-weight HTTP helpers for interacting with the CBRAIN REST API.
+"""Light-weight HTTP helpers for interacting with the CBRAIN REST API.
 
 Only the low-level mechanics of *sending* a request belong here; no higher-level
 parsing or business logic is performed.  These helpers are used throughout the
@@ -31,7 +30,12 @@ DEFAULT_TIMEOUT = 60.0
 
 
 def _default_timeout() -> Optional[float]:
-    """Return the timeout configured via ``CBRAIN_TIMEOUT`` or ``DEFAULT_TIMEOUT``."""
+    """Return timeout configured via ``CBRAIN_TIMEOUT``.
+
+    Returns:
+        Timeout in seconds if the environment variable is set and
+        convertible to ``float``; otherwise :data:`DEFAULT_TIMEOUT`.
+    """
     env = os.getenv("CBRAIN_TIMEOUT")
     if not env:
         return DEFAULT_TIMEOUT
@@ -58,6 +62,7 @@ def cbrain_get(
             (e.g. ``"groups/42"`` or ``"userfiles"``).
         token: The ``cbrain_api_token`` string obtained from a session.
         params: Additional query parameters to include in the URL.
+        timeout: Request timeout in seconds.
 
     Returns:
         The raw :class:`requests.Response` object.
@@ -102,6 +107,7 @@ def cbrain_post(
         data: Form fields as a mapping from key to value.
         files: Mapping used by :pymod:`requests` to stream files.
         json: A JSON-serialisable Python mapping.
+        timeout: Request timeout in seconds.
 
     Returns:
         The raw :class:`requests.Response` object.
@@ -141,8 +147,7 @@ def cbrain_put(
         token: ``cbrain_api_token`` string.
         data: Optional form-encoded payload.
         json: Optional JSON payload.
-        allow_redirects: Whether ``requests`` should automatically follow
-            HTTP redirects.
+        timeout: Request timeout in seconds.
 
     Returns:
         The raw :class:`requests.Response` object.
@@ -182,6 +187,7 @@ def cbrain_delete(
         token: ``cbrain_api_token`` string.
         data: Optional form-encoded payload.
         json: Optional JSON payload.
+        timeout: Request timeout in seconds.
         allow_redirects: Whether ``requests`` should automatically follow
             HTTP redirects.
 

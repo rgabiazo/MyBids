@@ -1,6 +1,4 @@
-"""
-Populate *fmap/…_epi.nii.gz* when functional runs exist only for one
-phase-encoding direction (for example, AP → generate matching PA).
+"""Populate ``fmap/…_epi.nii.gz`` when functional runs exist for one phase direction.
 
 Selection rules
 ---------------

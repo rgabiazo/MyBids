@@ -9,9 +9,9 @@ Design goals
 * **Single point of truth** – a shared configuration avoids diverging logging
   behaviour across sub‑commands.
 * **Noise control** – Paramiko (SSH/SFTP backend) emits verbose DEBUG logs that
-  are rarely useful to end‑users.  The helper therefore downgrades Paramiko’s
-  default level to ``WARNING`` unless the caller explicitly requests verbose
-  output.
+  are rarely useful during regular operation.  The helper therefore downgrades
+  Paramiko’s default level to ``WARNING`` unless the caller explicitly requests
+  verbose output.
 * **Compatibility** – only stdlib logging is used; no third‑party
   dependencies are introduced.
 

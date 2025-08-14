@@ -1,16 +1,13 @@
-"""
-High-level helpers for validating a local BIDS dataset and comparing it
-against files on a remote SFTP data-provider registered in CBRAIN.
+"""Validate a local BIDS dataset and compare it with remote SFTP files.
 
 The public entry points focus on two scenarios:
 
 * ``check_bids_and_sftp_files`` – validate a local BIDS directory, then
   compare every matching subfolder or file against the same path on the
   SFTP server.
-
 * ``check_bids_and_sftp_files_with_group`` – same as above but filtered so
   that only local top-level folders present in a specific CBRAIN *group*
-  (project) are considered.  This prevents uploading or comparing subjects
+  (project) are considered. This prevents uploading or comparing subjects
   that are not part of the project.
 
 All routines assume that a valid *servers.yaml* entry exists for the SFTP

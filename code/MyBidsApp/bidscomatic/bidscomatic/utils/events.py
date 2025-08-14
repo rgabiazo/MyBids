@@ -1,10 +1,8 @@
-"""
-Behavioural‑sheet helpers for producing BIDS‑compatible ``*_events.tsv``
-frames.
+"""Behavioural-sheet helpers for BIDS-compatible ``*_events.tsv`` frames.
 
-This module is deliberately **pure**: no files are written – only
-:pyclass:`pandas.DataFrame` objects are returned.  The separation keeps the
-logic reusable in interactive notebooks and makes unit‑testing trivial.
+This module is deliberately pure: no files are written – only
+:pyclass:`pandas.DataFrame` objects are returned. The separation keeps the
+logic reusable in interactive notebooks and makes unit testing trivial.
 
 Key responsibilities:
 1. **Discovery** – locate CSV/TSV/Excel sheets underneath an arbitrary folder

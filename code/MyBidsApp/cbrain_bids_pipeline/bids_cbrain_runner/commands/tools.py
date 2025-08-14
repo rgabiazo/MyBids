@@ -389,3 +389,179 @@ def show_group_tasks_status(
     logger.info("Found %d task(s)%s", len(tasks), suffix)
     for task in tasks:
         logger.info("Task %s is at status: %s", task.get("id"), task.get("status"))
+
+
+def _is_failed(status: str) -> bool:
+    """Return ``True`` if *status* represents a failure state."""
+
+    return "fail" in status.lower()
+
+
+def _is_recoverable(status: str) -> bool:
+    """Return ``True`` if *status* represents a recoverable error or failure state."""
+
+    status_lower = status.lower()
+    return "error" in status_lower or "fail" in status_lower
+
+
+def retry_task(
+    base_url: str,
+    token: str,
+    task_id: int,
+    *,
+    timeout: float | None = None,
+    current_status: str | None = None,
+) -> None:
+    """Request a retry of ``task_id`` if it is in a failed state.
+
+    The function first checks the task's status to avoid spurious API
+    calls on running or completed tasks.  Any HTTP or CBRAIN errors are
+    logged but do not raise exceptions.
+    """
+
+    client = CbrainClient(base_url, token)
+    if current_status is None:
+        try:
+            current_status = client.get_task_status(task_id)
+        except CbrainTaskError as exc:  # pragma: no cover - network failure
+            logger.error("Could not fetch status for task %d: %s", task_id, exc)
+            return
+
+    if not _is_failed(current_status):
+        logger.info(
+            "Task %d not in failed state (%s); skipping",
+            task_id,
+            current_status,
+        )
+        return
+
+    status_lower = current_status.lower()
+    if "setup" in status_lower:
+        operation = "restart_setup"
+    elif "cluster" in status_lower:
+        operation = "restart_cluster"
+    elif "post" in status_lower:
+        operation = "restart_postprocess"
+    else:
+        operation = "restart_cluster"
+
+    try:
+        client.operate_tasks(operation, [task_id], timeout=timeout)
+    except CbrainTaskError as exc:
+        logger.error("Could not retry task %d: %s", task_id, exc)
+        return
+
+    logger.info("Retry requested for task %d", task_id)
+
+
+def retry_failed_tasks(
+    base_url: str,
+    token: str,
+    group_id: int,
+    *,
+    task_type: str | None = None,
+    per_page: int = 100,
+    timeout: float | None = None,
+) -> None:
+    """Retry every failed task within ``group_id``.
+
+    Tasks are filtered by *task_type* if provided.  Only entries whose
+    status contains ``"fail"`` (case-insensitive) trigger a retry.
+    """
+
+    client = CbrainClient(base_url, token)
+
+    tasks = list_tasks_by_group(
+        client,
+        group_id,
+        task_type=task_type,
+        per_page=per_page,
+        timeout=timeout,
+    )
+
+    failed = [t for t in tasks if _is_failed(str(t.get("status", "")))]
+    logger.info("Found %d failed task(s)", len(failed))
+
+    for task in failed:
+        tid = task.get("id")
+        if tid is None:
+            continue
+        retry_task(
+            base_url,
+            token,
+            int(tid),
+            timeout=timeout,
+            current_status=str(task.get("status", "")),
+        )
+
+
+def error_recover_task(
+    base_url: str,
+    token: str,
+    task_id: int,
+    *,
+    timeout: float | None = None,
+    current_status: str | None = None,
+) -> None:
+    """Trigger error recovery for ``task_id`` if in a failed or error state."""
+
+    client = CbrainClient(base_url, token)
+    if current_status is None:
+        try:
+            current_status = client.get_task_status(task_id)
+        except CbrainTaskError as exc:  # pragma: no cover - network failure
+            logger.error("Could not fetch status for task %d: %s", task_id, exc)
+            return
+
+    if not _is_recoverable(current_status):
+        logger.info(
+            "Task %d not in recoverable state (%s); skipping",
+            task_id,
+            current_status,
+        )
+        return
+
+    try:
+        client.operate_tasks("recover", [task_id], timeout=timeout)
+    except CbrainTaskError as exc:  # pragma: no cover - network failure
+        logger.error("Could not recover task %d: %s", task_id, exc)
+        return
+
+    logger.info("Error recovery requested for task %d", task_id)
+
+
+def error_recover_failed_tasks(
+    base_url: str,
+    token: str,
+    group_id: int,
+    *,
+    task_type: str | None = None,
+    per_page: int = 100,
+    timeout: float | None = None,
+) -> None:
+    """Trigger error recovery for every task in ``group_id`` in failed or error state."""
+
+    client = CbrainClient(base_url, token)
+
+    tasks = list_tasks_by_group(
+        client,
+        group_id,
+        task_type=task_type,
+        per_page=per_page,
+        timeout=timeout,
+    )
+
+    recoverable = [t for t in tasks if _is_recoverable(str(t.get("status", "")))]
+    logger.info("Found %d recoverable task(s)", len(recoverable))
+
+    for task in recoverable:
+        tid = task.get("id")
+        if tid is None:
+            continue
+        error_recover_task(
+            base_url,
+            token,
+            int(tid),
+            timeout=timeout,
+            current_status=str(task.get("status", "")),
+        )

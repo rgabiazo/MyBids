@@ -235,7 +235,6 @@ def update_dataset_description(
     Raises:
         FileNotFoundError: When ``dataset_description.json`` does not exist.
     """
-
     dd_json = root / "dataset_description.json"
     if not dd_json.exists():
         raise FileNotFoundError(dd_json)

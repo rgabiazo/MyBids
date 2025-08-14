@@ -229,7 +229,7 @@ dicomatic/
 
 ## License
 
-`dicomatic` is released under the **MIT License** – see [`LICENSE`](../LICENSE).
+`dicomatic` is released under the **MIT License** – see [LICENSE](../../../LICENSE).
 
 ---
 

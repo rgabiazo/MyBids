@@ -16,6 +16,8 @@ fsl:
 cbrain:
   hippunfold:
     hippunfold_output_dir: "derivatives/hippunfold"
+  fmriprep:
+    fmriprep_output_dir: "derivatives/fmriprep"
 
 bids_pipeline:
   signal_detection_theory:
@@ -112,4 +114,18 @@ dataset_descriptions:
           version: "6.3.0"
           codeURL: "https://github.com/aces/cbrain"
           description: "Used to execute hippunfold."
+
+    fmriprep:
+      name: "fMRIPrep (via CBRAIN)"
+      dataset_type: "derivative"
+      description:  "fMRIPrep output using cbrain pipeline."
+      generatedby:
+        - name: "fMRIPrep"
+          version: "23.0.2"
+          codeURL: "https://github.com/nipreps/fmriprep"
+          description: "Used for BIDS-compliant fMRI preprocessing."
+        - name: "CBRAIN"
+          version: "6.3.0"
+          codeURL: "https://github.com/aces/cbrain"
+          description: "Used to execute fMRIPrep."
           

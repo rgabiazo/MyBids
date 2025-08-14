@@ -48,3 +48,32 @@ def test_default_json_log_location(tmp_path: Path) -> None:
     )
 
     assert log_file.exists()
+
+
+def test_dataset_root_log_location(tmp_path: Path) -> None:
+    archive = tmp_path / "example.zip"
+    with ZipFile(archive, "w") as zf:
+        zf.writestr("dummy.dcm", b"0")
+
+    from bidscomatic.utils import logging as log_utils
+
+    repo_root = Path(log_utils.__file__).resolve().parents[5]
+    pkg_logs = Path(log_utils.__file__).resolve().parents[1] / "logs"
+    log_file = pkg_logs / "bidscomatic.log"
+    if log_file.exists():
+        log_file.unlink()
+
+    env = os.environ.copy()
+    env["BIDS_ROOT"] = str(repo_root)
+
+    subprocess.run(
+        CLI + [str(archive)],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=repo_root,
+        env=env,
+    )
+
+    assert log_file.exists()
+    log_file.unlink()

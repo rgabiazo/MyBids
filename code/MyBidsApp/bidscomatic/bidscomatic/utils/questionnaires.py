@@ -1,7 +1,6 @@
-"""
-Utility functions for transforming a **multi-session questionnaire sheet** into
-tidy, BIDS-compatible ``*.tsv`` files.  The module never interacts with the file
-system and therefore stays easy to unit-test.
+"""Transform questionnaire sheets into tidy BIDS-compatible tables.
+
+The module operates purely in memory, simplifying unit tests.
 """
 
 from __future__ import annotations

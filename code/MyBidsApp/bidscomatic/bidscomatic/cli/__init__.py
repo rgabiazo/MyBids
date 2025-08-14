@@ -1,6 +1,4 @@
-"""
-Entry-point module that exposes the project-wide Click *group* ``main`` under
-the console script **bidscomatic-cli**.
+"""Expose the project-wide Click group for the ``bidscomatic-cli`` script.
 
 The module:
 
@@ -14,7 +12,7 @@ The module:
 * registers every sub-command located in sibling modules.
 
 No state is mutated outside the Click context, which keeps the CLI layer
-side-effect-free and easy to test.
+side effect free and easy to test.
 """
 
 from __future__ import annotations

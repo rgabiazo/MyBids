@@ -201,16 +201,16 @@ LOG_FILE="${LOG_DIR}/run_synthstrip_extraction_$(date '+%Y-%m-%d_%H-%M-%S').log"
                 echo "T1w Image: $T1W_FILE" | tee -a "$LOG_FILE"
                 
                 if [ -z "$SES_ID" ]; then
-                    DERIV_ANAT_DIR="$BASE_DIR/derivatives/freesurfer/$SUBJ_ID/anat"
+                    DERIV_ANAT_DIR="$BASE_DIR/derivatives/synthstrip/$SUBJ_ID/anat"
                 else
-                    DERIV_ANAT_DIR="$BASE_DIR/derivatives/freesurfer/$SUBJ_ID/$SES_ID/anat"
+                    DERIV_ANAT_DIR="$BASE_DIR/derivatives/synthstrip/$SUBJ_ID/$SES_ID/anat"
                 fi
                 mkdir -p "$DERIV_ANAT_DIR"
                 if [ -z "$SES_ID" ]; then
-                    OUTPUT_FILE="$DERIV_ANAT_DIR/${SUBJ_ID}_desc-synthstrip_T1w_brain.nii.gz"
+                    OUTPUT_FILE="$DERIV_ANAT_DIR/${SUBJ_ID}_desc-brain_T1w.nii.gz"
                     REORIENTED_T1W_FILE="${ANAT_DIR}/${SUBJ_ID}_desc-reoriented_T1w.nii.gz"
                 else
-                    OUTPUT_FILE="$DERIV_ANAT_DIR/${SUBJ_ID}_${SES_ID}_desc-synthstrip_T1w_brain.nii.gz"
+                    OUTPUT_FILE="$DERIV_ANAT_DIR/${SUBJ_ID}_${SES_ID}_desc-brain_T1w.nii.gz"
                     REORIENTED_T1W_FILE="${ANAT_DIR}/${SUBJ_ID}_${SES_ID}_desc-reoriented_T1w.nii.gz"
                 fi
 

@@ -78,6 +78,7 @@ def test_cli_download_group_name(monkeypatch, tmp_path):
         cli_mod.main()
 
     assert dl_calls and dl_calls[0]["group_id"] == 13
+    assert dl_calls[0]["output_dir_name"] is None
 
 
 def test_launch_tool_spinner(monkeypatch):
@@ -218,3 +219,149 @@ def test_batch_launch_wrapper_no_spinner(monkeypatch):
     assert spinner == [False, False]
     assert len(launch_calls) == 1
     assert launch_calls[0]["show_spinner"] is False
+
+def test_batch_launch_injects_bids_dir(monkeypatch):
+    from bids_cbrain_runner.commands import tool_launcher as tl_mod
+
+    monkeypatch.setattr(tl_mod, "CbrainClient", lambda *a, **k: object())
+    monkeypatch.setattr(
+        tl_mod,
+        "list_userfiles_by_group",
+        lambda *a, **k: [{"id": 7}],
+    )
+    monkeypatch.setattr(tl_mod, "run_with_spinner", lambda func, msg, show=True: func())
+
+    launch_calls = []
+    monkeypatch.setattr(tl_mod, "launch_tool", lambda **kw: launch_calls.append(kw))
+
+    tl_mod.launch_tool_batch_for_group(
+        base_url="https://x",
+        token="tok",
+        tools_cfg={},
+        tool_name="fmriprep",
+        group_id=11,
+        show_spinner=False,
+    )
+
+    assert launch_calls
+    extra = launch_calls[0]["extra_params"]
+    assert extra["bids_dir"] == 7
+    assert "subject_dir" not in extra
+
+
+def test_batch_launch_injects_subject_dir_when_required(monkeypatch):
+    """subject_dir parameter should be added when tools.yaml requests it."""
+    from bids_cbrain_runner.commands import tool_launcher as tl_mod
+
+    monkeypatch.setattr(tl_mod, "CbrainClient", lambda *a, **k: object())
+    monkeypatch.setattr(
+        tl_mod,
+        "list_userfiles_by_group",
+        lambda *a, **k: [{"id": 42}],
+    )
+    monkeypatch.setattr(tl_mod, "run_with_spinner", lambda func, msg, show=True: func())
+
+    launch_calls = []
+    monkeypatch.setattr(tl_mod, "launch_tool", lambda **kw: launch_calls.append(kw))
+
+    tools_cfg = {"hippunfold": {"requires_subject_dir": True}}
+    tl_mod.launch_tool_batch_for_group(
+        base_url="https://x",
+        token="tok",
+        tools_cfg=tools_cfg,
+        tool_name="hippunfold",
+        group_id=11,
+        show_spinner=False,
+    )
+
+    assert launch_calls
+    extra = launch_calls[0]["extra_params"]
+    assert extra["bids_dir"] == 42
+    assert extra["subject_dir"] == 42
+
+
+def test_batch_launch_merges_interface_ids(monkeypatch):
+    """Extra interface_userfile_ids should be combined with the subject."""
+    from bids_cbrain_runner.commands import tool_launcher as tl_mod
+
+    monkeypatch.setattr(tl_mod, "CbrainClient", lambda *a, **k: object())
+    monkeypatch.setattr(
+        tl_mod,
+        "list_userfiles_by_group",
+        lambda *a, **k: [{"id": 55}],
+    )
+    monkeypatch.setattr(tl_mod, "run_with_spinner", lambda func, msg, show=True: func())
+
+    launch_calls = []
+    monkeypatch.setattr(tl_mod, "launch_tool", lambda **kw: launch_calls.append(kw))
+
+    tl_mod.launch_tool_batch_for_group(
+        base_url="https://x",
+        token="tok",
+        tools_cfg={},
+        tool_name="demo",
+        group_id=11,
+        extra_params={"interface_userfile_ids": 99},
+        show_spinner=False,
+    )
+
+    assert launch_calls
+    ids = launch_calls[0]["extra_params"]["interface_userfile_ids"]
+    assert ids == [55, 99]
+
+
+def test_batch_launch_subset_ids(monkeypatch):
+    from bids_cbrain_runner.commands import tool_launcher as tl_mod
+
+    monkeypatch.setattr(tl_mod, "CbrainClient", lambda *a, **k: object())
+    monkeypatch.setattr(
+        tl_mod, "list_userfiles_by_group", lambda *a, **k: [{"id": 1}, {"id": 2}]
+    )
+    monkeypatch.setattr(tl_mod, "run_with_spinner", lambda func, msg, show=True: func())
+
+    launch_calls = []
+    monkeypatch.setattr(tl_mod, "launch_tool", lambda **kw: launch_calls.append(kw))
+
+    tl_mod.launch_tool_batch_for_group(
+        base_url="https://x",
+        token="tok",
+        tools_cfg={},
+        tool_name="demo",
+        group_id=11,
+        userfile_ids=[2],
+        show_spinner=False,
+    )
+
+    assert launch_calls and launch_calls[0]["extra_params"]["interface_userfile_ids"] == [2]
+
+
+def test_cli_batch_userfile_ids(monkeypatch):
+    cli_mod = _setup_common(monkeypatch)
+
+    monkeypatch.setattr(
+        cli_mod,
+        "resolve_group_id",
+        lambda base_url, token, ident, per_page=100, timeout=None: 42,
+    )
+
+    batch_calls = []
+    monkeypatch.setattr(
+        cli_mod,
+        "launch_tool_batch_for_group",
+        lambda **kw: batch_calls.append(kw),
+    )
+
+    argv = [
+        "prog",
+        "--launch-tool",
+        "hippunfold",
+        "--launch-tool-batch-group",
+        "MyProj",
+        "--launch-tool-userfile-ids",
+        "1,2",
+    ]
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit):
+        cli_mod.main()
+
+    assert batch_calls and batch_calls[0]["userfile_ids"] == [1, 2]

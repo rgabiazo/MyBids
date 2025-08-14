@@ -5,8 +5,8 @@ This module intentionally keeps formatting concerns (pretty‑printing) separate
 from computational logic.  The sole public helper,
 :pyfunc:`print_jsonlike_dict`, takes an already structured *Python* object –
 typically produced by the directory‑tree walkers – and logs it as an indented
-JSON block so that users can visually inspect nested structures without having
-BIDS knowledge baked into the logger itself.
+JSON block for visual inspection of nested structures without embedding BIDS
+knowledge in the logger itself.
 
 Why use ``logger.info`` instead of ``print``?
 -------------------------------------------

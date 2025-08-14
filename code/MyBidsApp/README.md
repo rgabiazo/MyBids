@@ -108,6 +108,17 @@ tools:
       beluga:
         tool_config_id: 5035
         bourreau_id: 56
+      rorqual:
+        tool_config_id: 8954
+        bourreau_id: 104
+    keep_dirs: [config, logs, work]
+  fmriprep:
+    version: "23.0.2"
+    default_cluster: beluga
+    clusters:
+      beluga:
+        tool_config_id: 4538
+        bourreau_id: 56
     keep_dirs: [config, logs, work]
 ```
 
@@ -116,6 +127,8 @@ tools:
 cbrain:
   hippunfold:
     hippunfold_output_dir: derivatives/hippunfold
+  fmriprep:
+    fmriprep_output_dir: derivatives/fmriprep
 filetype_inference:
   fallback: BidsSubject
   patterns:
@@ -171,10 +184,10 @@ bids cbrain --download-tool hippunfold --group-id 98765 --flatten
 
 ## 📝 Acknowledgements & citations
 
-* **BIDS Validator** – Gorgolewski K.J., et al. *Sci Data* 2016;3:160044. doi:10.1038/sdata.2016.44  
-* **CBRAIN** – Sherif T., et al. *Front Neuroinform* 2014;8:54. doi:10.3389/fninf.2014.00054  
-* **HippUnfold** – de Kraker L., et al. *eLife* 2022;11:e77945. doi:10.7554/eLife.77945 
-* **dcm2niix** – Li X., et al. *Front Neuroinform* 2016;10:30. doi:10.3389/fninf.2016.00030  
+* **HippUnfold** — de Kraker L., et al. *eLife* **11**, e77945 (2022). doi:10.7554/eLife.77945
+* **BIDS Validator** — Gorgolewski K.J., et al. *Sci Data* **3**, 160044 (2016). doi:10.1038/sdata.2016.44
+* **dcm2niix** — Li X., et al. *Front. Neuroinform.* **10**, 30 (2016). doi:10.3389/fninf.2016.00030
+* **CBRAIN** — Sherif T., et al. *Front. Neuroinform.* **8**, 54 (2014). doi:10.3389/fninf.2014.00054 
 
 If you use `MyBidsApp` in your research, please cite the relevant upstream tools as well as this repository.
 
@@ -192,4 +205,4 @@ Bug reports & feature requests are welcome via GitHub Issues.
 
 ## License
 
-[MIT](LICENSE) – free to use, modify and distribute with attribution.
+[MIT](../../LICENSE) – free to use, modify and distribute with attribution.

@@ -1,5 +1,4 @@
-"""
-High-level helpers for downloading CBRAIN-generated derivative folders.
+"""High-level helpers for downloading CBRAIN-generated derivative folders.
 
 This module centralises *all* path-resolution logic and metadata handling
 required by the :pymod:`bids_cbrain_runner.commands.download` CLI.  Only
@@ -42,6 +41,87 @@ from bids_cbrain_runner.commands.sftp import list_subdirs_and_files
 
 from .metadata import runner_generatedby_entry
 
+
+def _find_session_component(path: str) -> str | None:
+    """Return the ``ses-<label>`` component from *path* if present."""
+    for part in Path(path).parts:
+        if part.startswith("ses-"):
+            return part
+    return None
+
+
+def _find_subject_component(path: str) -> str | None:
+    """Return the ``sub-<label>`` component from *path* if present."""
+    for part in Path(path).parts:
+        if part.startswith("sub-"):
+            return part
+    return None
+
+
+def _normalize_session_name(directory: str, fname: str) -> str:
+    """Insert or replace the session label in *fname* based on *directory*.
+
+    The function inspects *directory* for a ``ses-`` component and ensures
+    that *fname* contains the same session label.  When a different session is
+    already present in the file name it is replaced.  If the file lacks any
+    session token the label is inserted after the subject identifier when
+    available or prepended otherwise.
+    """
+    ses = _find_session_component(directory)
+    if not ses:
+        return fname
+
+    import re
+
+    if re.search(r"ses-[^_]+", fname):
+        return re.sub(r"ses-[^_]+", ses, fname)
+
+    m = re.match(r"(sub-[^_]+)(.*)", fname)
+    if m:
+        return f"{m.group(1)}_{ses}{m.group(2)}"
+    return f"{ses}_{fname}"
+
+
+def _normalize_subject_name(directory: str, fname: str) -> str:
+    """Insert or replace the subject label in *fname* based on *directory*."""
+    sub = _find_subject_component(directory)
+    if not sub:
+        return fname
+
+    import re
+
+    if re.search(r"sub-[^_]+", fname):
+        return re.sub(r"sub-[^_]+", sub, fname)
+
+    return f"{sub}_{fname}"
+
+
+def _transfer_file(
+    sftp,
+    src_file: str,
+    dst_dir: str,
+    fname: str,
+    *,
+    normalize_session: bool,
+    normalize_subject: bool,
+    force: bool,
+    dry_run: bool,
+) -> None:
+    """Copy *src_file* into *dst_dir* honouring force/dry-run semantics."""
+    out_name = fname
+    if normalize_subject:
+        out_name = _normalize_subject_name(dst_dir, out_name)
+    if normalize_session:
+        out_name = _normalize_session_name(dst_dir, out_name)
+    dst_file = os.path.join(dst_dir, out_name)
+    if not force and os.path.exists(dst_file):
+        return
+    if dry_run:
+        logger.info("[DRY] Would GET %s → %s", src_file, dst_file)
+    else:
+        sftp.get(src_file, dst_file)
+        logger.info("GET %s → %s", src_file, dst_file)
+
 logger = logging.getLogger(__name__)
 
 
@@ -53,20 +133,21 @@ def resolve_output_dir(
     tool_name: str,
     config_dict: Mapping[str, object] | None,
     *,
+    output_dir_name: str | None = None,
     force: bool = False,
     dry_run: bool = False,
 ) -> str:
-    """Return (and optionally create) the derivatives directory for *tool_name*.
+    """Return the derivatives directory for ``tool_name`` (create if missing).
 
     The lookup order matches the philosophy used throughout
-    *bids_cbrain_runner*—**explicit overrides first, sensible defaults
-    last**:
+    *bids_cbrain_runner*—explicit overrides first, sensible defaults
+    last:
 
     1. When *config_dict* contains a value for
        ``cbrain.<tool_name>.<tool_name>_output_dir``, use it verbatim if
        absolute, or relative to *bids_root* otherwise.
-    2. Fallback to ``<bids_root>/derivatives/<tool_name>`` if no override is
-       present.
+    2. Fallback to ``<bids_root>/derivatives/<output_dir_name>`` if no override
+       is present (or ``tool_name`` when *output_dir_name* is *None*).
 
     Args:
         bids_root: Absolute path to the BIDS dataset root (the folder that
@@ -75,6 +156,8 @@ def resolve_output_dir(
         config_dict: Deep-merged configuration returned by
             :func:`bids_cbrain_runner.api.config_loaders.load_pipeline_config`.
             The argument may be *None* when no configuration is available.
+        output_dir_name: Override for the final directory name when the
+            configuration does not specify one explicitly.
         force: When *True*, ensure that the directory hierarchy exists even
             if it had to be created just now.  Has no effect when the path
             is already present.
@@ -91,7 +174,8 @@ def resolve_output_dir(
         parsing *config_dict* is logged but does not abort execution.
     """
     # Default location beneath <BIDS_ROOT>/derivatives
-    out_dir = os.path.join(bids_root, "derivatives", tool_name)
+    out_name = output_dir_name or tool_name
+    out_dir = os.path.join(bids_root, "derivatives", out_name)
 
     # Attempt to honour an explicit override from the YAML configuration
     try:
@@ -200,7 +284,12 @@ def flattened_download(
     *,
     skip_dirs: Sequence[str] | None = None,
     keep_dirs: Sequence[str] | None = None,
+    skip_files: Sequence[str] | None = None,
+    subject_dirs: Sequence[str] | None = None,
     wrapper: str | None = None,
+    path_map: Mapping[str, Sequence[str]] | None = None,
+    normalize_session: bool = False,
+    normalize_subject: bool = False,
     dry_run: bool = False,
     force: bool = False,
 ) -> None:
@@ -211,11 +300,21 @@ def flattened_download(
     neatly under the subject/session hierarchy required by downstream BIDS
     derivatives.
 
-    The function supports two optional lists:
+    The function supports three optional lists:
 
     * *skip_dirs* – names that are **never** downloaded
     * *keep_dirs* – additional top-level directories to download
       *unflattened* (e.g. ``logs`` or ``work``)
+    * *subject_dirs* – keep-dirs whose contents should be placed under
+      the inferred ``sub-``/``ses-`` hierarchy
+    * *skip_files* – filenames to ignore entirely (e.g. ``dataset_description.json``)
+    * *path_map* – remap specific directory names to alternate destination
+      paths.  When multiple destinations are given the directory is downloaded
+      once and additional locations are created as relative symlinks.
+    * *normalize_session* – ensure filenames reflect the session directory
+      they reside in
+    * *normalize_subject* – ensure filenames include the subject directory
+      they reside in
 
     Args:
         sftp: An **active** Paramiko SFTP client.
@@ -224,8 +323,15 @@ def flattened_download(
         tool_name: CBRAIN tool slug; used as the default *wrapper*.
         skip_dirs: Sub-directories to ignore entirely.
         keep_dirs: Sub-directories that bypass the flattening logic.
+        skip_files: Filenames to skip during transfer.
         wrapper: Explicit name of the wrapper directory.  Defaults to
             *tool_name* when *None*.
+        path_map: Mapping of directory names to alternative destination paths
+            relative to their parent.
+        normalize_session: If *True*, ensure filenames include the session
+            label of their containing directory.
+        normalize_subject: If *True*, ensure filenames include the subject
+            label of their containing directory.
         dry_run: If *True*, log planned transfers but skip network/disk I/O.
         force: If *True*, overwrite existing local files.
 
@@ -235,107 +341,194 @@ def flattened_download(
     """
     skip_dirs_set: Set[str] = set(skip_dirs or [])
     keep_dirs_set: Set[str] = set(keep_dirs or [])
+    skip_files_set: Set[str] = set(skip_files or [])
+    subject_dirs_set: Set[str] = set(subject_dirs or [])
+    path_map = {k: list(v) if isinstance(v, (list, tuple)) else [v] for k, v in (path_map or {}).items()}
     wrapper = wrapper or tool_name
 
     # Remove any keep-dirs that are explicitly skipped and abort when the
     # wrapper itself is marked for exclusion
     keep_dirs_set -= skip_dirs_set
-    if wrapper in skip_dirs_set:
+    if wrapper and wrapper in skip_dirs_set:
         return
 
+    # Immediate listing of remote_dir
+    subdirs, files = list_subdirs_and_files(sftp, remote_dir)
+    subdirs = [d for d in subdirs if d not in skip_dirs_set]
+
     # ------------------------------------------------------------------ #
-    # Derive sub- and ses- identifiers from the remote path              #
+    # Derive sub- and ses- identifiers                                  #
     # ------------------------------------------------------------------ #
+    import re
+
     name = os.path.basename(remote_dir.lstrip("/"))
-    parts: list[str] = name.split("_")
-    sub = next((p for p in parts if p.startswith("sub-")), None)
-    ses = next((p for p in parts if p.startswith("ses-")), None)
+    sub_match = re.search(r"(sub-[^_/\-]+)", name)
+    ses_match = re.search(r"(ses-[^_/\-]+)", name)
+    sub = sub_match.group(1) if sub_match else None
+    ses = ses_match.group(1) if ses_match else None
+
+    if not sub:
+        candidate = next((d for d in subdirs if d.startswith("sub-")), None)
+        if candidate:
+            sub = candidate
+            inner, _ = list_subdirs_and_files(sftp, os.path.join(remote_dir, candidate))
+            ses = next((d for d in inner if d.startswith("ses-")), ses)
+
     if not sub:
         logger.warning("Could not infer *sub-* directory from %s", remote_dir)
 
     primary = (
         os.path.join(local_root, sub, ses)
         if sub and ses
-        else os.path.join(local_root, sub) if sub else os.path.join(local_root, name)
+        else os.path.join(local_root, sub) if sub else local_root
     )
 
-    # Map top-level remote dirs → local destinations
-    mapping: dict[str, str] = {wrapper: primary}
-    for kd in keep_dirs_set - {wrapper}:
-        mapping[kd] = (
-            os.path.join(local_root, kd, sub, ses)
-            if sub and ses
-            else os.path.join(local_root, kd, sub or name)
-        )
+    mapping: dict[str, str] = {}
+    wrapper_present = wrapper in subdirs if wrapper else False
+
+    if wrapper_present:
+        mapping[wrapper] = primary
+        for kd in keep_dirs_set - {wrapper}:
+            mapping[kd] = (
+                os.path.join(local_root, kd, sub, ses)
+                if sub and ses
+                else os.path.join(local_root, kd, sub) if sub else os.path.join(local_root, kd)
+            )
+    else:
+        for sd in [d for d in subdirs if d.startswith("sub-")]:
+            mapping[sd] = os.path.join(local_root, sd)
+        for kd in keep_dirs_set:
+            base = os.path.join(local_root, kd)
+            if kd in subject_dirs_set and sub:
+                mapping[kd] = (
+                    os.path.join(base, sub, ses)
+                    if ses
+                    else os.path.join(base, sub)
+                )
+            else:
+                mapping[kd] = base
 
     for dest in mapping.values():
         if not dry_run:
             Path(dest).mkdir(parents=True, exist_ok=True)
 
-    # ------------------------------------------------------------------ #
-    # Immediate listing of remote_dir to decide which dirs to traverse   #
-    # ------------------------------------------------------------------ #
-    subdirs, files = list_subdirs_and_files(sftp, remote_dir)
-    subdirs = [d for d in subdirs if d not in skip_dirs_set]
-    subdirs = [d for d in subdirs if d == wrapper or d in mapping]
+    subdirs = [d for d in subdirs if d in mapping]
 
     for sd in subdirs:
         orig_src = os.path.join(remote_dir, sd)
         dst = mapping[sd]
 
-        # Keep track of any files present directly under the keep-dir root
         root_subdirs, root_files = list_subdirs_and_files(sftp, orig_src)
-
-        # Heuristic: some tools wrap output inside a single sub-*/ses-* folder
         src = orig_src
-        if sd == wrapper:
+
+        if wrapper_present and sd == wrapper:
             inner = root_subdirs
             if len(inner) == 1 and inner[0].startswith("sub-"):
                 src = os.path.join(src, inner[0])
-
-        elif sd in keep_dirs_set:
+        elif wrapper_present and sd in keep_dirs_set:
             inner = root_subdirs
-            # Normalise keep-dirs so they align with the subject folder
-            if len(inner) == 1 and inner[0] == sub:
+            if len(inner) == 1 and sub and inner[0] == sub:
                 src = os.path.join(src, sub)
                 inner, _ = list_subdirs_and_files(sftp, src)
             if ses and len(inner) == 1 and inner[0] == ses:
                 src = os.path.join(src, ses)
-
+        elif not wrapper_present and sd in subject_dirs_set:
+            if sub and sub in root_subdirs:
+                # Copy root files to destination first.  Special-case
+                # ``dataset_description.json`` so that it always lands at the
+                # root of the keep-dir rather than beneath the subject
+                # hierarchy (e.g. ``QC/dataset_description.json`` instead of
+                # ``QC/sub-001/dataset_description.json``).
+                base_dest = os.path.join(local_root, sd)
+                if not dry_run:
+                    Path(base_dest).mkdir(parents=True, exist_ok=True)
+                for fname in root_files:
+                    if fname in skip_files_set:
+                        continue
+                    src_file = os.path.join(orig_src, fname)
+                    dest_dir = base_dest if fname == "dataset_description.json" else dst
+                    _transfer_file(
+                        sftp,
+                        src_file,
+                        dest_dir,
+                        fname,
+                        normalize_session=normalize_session,
+                        normalize_subject=normalize_subject,
+                        force=force,
+                        dry_run=dry_run,
+                    )
+                # Merge subject directory directly under destination
+                _naive_recursive(
+                    sftp,
+                    os.path.join(orig_src, sub),
+                    dst,
+                    skip_dirs=skip_dirs_set,
+                    skip_files=skip_files_set,
+                    dry_run=dry_run,
+                    force=force,
+                    path_map=path_map,
+                    normalize_session=normalize_session,
+                    normalize_subject=normalize_subject,
+                )
+                root_subdirs = [d for d in root_subdirs if d != sub]
+                for inner in root_subdirs:
+                    _naive_recursive(
+                        sftp,
+                        os.path.join(orig_src, inner),
+                        os.path.join(dst, inner),
+                        skip_dirs=skip_dirs_set,
+                        skip_files=skip_files_set,
+                        dry_run=dry_run,
+                        force=force,
+                        path_map=path_map,
+                        normalize_session=normalize_session,
+                        normalize_subject=normalize_subject,
+                    )
+                continue
+        
         _naive_recursive(
             sftp,
             src,
             dst,
             skip_dirs=skip_dirs_set,
+            skip_files=skip_files_set,
             dry_run=dry_run,
             force=force,
+            path_map=path_map,
+            normalize_session=normalize_session,
+            normalize_subject=normalize_subject,
         )
 
-        # When the source path was normalised away from orig_src, ensure that
-        # any loose files in the keep-dir root are also downloaded
         if sd in keep_dirs_set and src != orig_src:
             for fname in root_files:
-                src_file = os.path.join(orig_src, fname)
-                dst_file = os.path.join(dst, fname)
-                if not force and os.path.exists(dst_file):
+                if fname in skip_files_set:
                     continue
-                if dry_run:
-                    logger.info("[DRY] Would GET %s → %s", src_file, dst_file)
-                else:
-                    sftp.get(src_file, dst_file)
-                    logger.info("GET %s → %s", src_file, dst_file)
+                src_file = os.path.join(orig_src, fname)
+                _transfer_file(
+                    sftp,
+                    src_file,
+                    dst,
+                    fname,
+                    normalize_session=normalize_session,
+                    normalize_subject=normalize_subject,
+                    force=force,
+                    dry_run=dry_run,
+                )
 
-    # Copy any loose files located *directly* under remote_dir
     for fname in files:
-        src = os.path.join(remote_dir, fname)
-        dst = os.path.join(primary, fname)
-        if not force and os.path.exists(dst):
+        if fname in skip_files_set:
             continue
-        if dry_run:
-            logger.info("[DRY] Would GET %s → %s", src, dst)
-        else:
-            sftp.get(src, dst)
-            logger.info("GET %s → %s", src, dst)
+        src = os.path.join(remote_dir, fname)
+        _transfer_file(
+            sftp,
+            src,
+            local_root,
+            fname,
+            normalize_session=normalize_session,
+            normalize_subject=normalize_subject,
+            force=force,
+            dry_run=dry_run,
+        )
 
 
 def naive_download(
@@ -344,9 +537,13 @@ def naive_download(
     local_root: str | Path,
     *,
     skip_dirs: Sequence[str] | None = None,
-    dry_run: bool = False,
-    force: bool = False,
-) -> None:
+        skip_files: Sequence[str] | None = None,
+        path_map: Mapping[str, Sequence[str]] | None = None,
+        normalize_session: bool = False,
+        normalize_subject: bool = False,
+        dry_run: bool = False,
+        force: bool = False,
+    ) -> None:
     """Recursively mirror *remote_dir* under *local_root*.
 
     This strategy copies the remote hierarchy **verbatim**—no flattening
@@ -357,19 +554,33 @@ def naive_download(
         remote_dir: Absolute remote directory to mirror.
         local_root: Local directory that becomes the root of the mirror.
         skip_dirs: Sub-directories to skip entirely during recursion.
+        skip_files: File names to ignore during recursion.
+        path_map: Optional mapping of directory names to alternative
+            destination paths relative to their parent.  When a directory is
+            mapped to multiple locations, extra locations are created as
+            relative symlinks.
+        normalize_session: If *True*, ensure filenames include their session
+            label when beneath a ``ses-`` directory.
+        normalize_subject: If *True*, ensure filenames include their subject
+            label when beneath a ``sub-`` directory.
         dry_run: If *True*, log operations without performing them.
         force: If *True*, overwrite any existing local files.
     """
     base = os.path.basename(remote_dir.lstrip("/"))
     dest = os.path.join(local_root, base)
 
+    mapping = {k: list(v) if isinstance(v, (list, tuple)) else [v] for k, v in (path_map or {}).items()}
     _naive_recursive(
         sftp,
         remote_dir,
         dest,
         skip_dirs=set(skip_dirs or []),
+        skip_files=set(skip_files or []),
         dry_run=dry_run,
         force=force,
+        path_map=mapping,
+        normalize_session=normalize_session,
+        normalize_subject=normalize_subject,
     )
 
 
@@ -382,8 +593,13 @@ def _naive_recursive(
     local_path: str,
     *,
     skip_dirs: Set[str],
+    skip_files: Set[str],
     dry_run: bool,
     force: bool,
+    path_map: Mapping[str, Sequence[str]] | None = None,
+    normalize_session: bool = False,
+    normalize_subject: bool = False,
+    _mapped: Set[str] | None = None,
 ) -> None:
     """Depth-first copy of *remote_path* → *local_path*.
 
@@ -394,11 +610,37 @@ def _naive_recursive(
         skip_dirs: Directory names that must not be traversed.
         dry_run: If *True*, simulate transfers only.
         force: If *True*, overwrite existing local files.
+        path_map: Remapping rules for directory names.
+        normalize_session: Ensure filenames match the session directory.
+        normalize_subject: Ensure filenames include the subject directory.
+        _mapped: Internal set tracking which remote paths have been remapped.
 
     Notes:
         The function is intentionally *chatty* at INFO level to facilitate
         monitoring of long transfers.
     """
+    _mapped = _mapped or set()
+    base_name = os.path.basename(remote_path)
+    if path_map and base_name in path_map and remote_path not in _mapped:
+        _mapped.add(remote_path)
+        parent = os.path.dirname(local_path)
+        targets = [os.path.join(parent, rel) for rel in path_map[base_name]]
+        for dest in targets:
+            _naive_recursive(
+                sftp,
+                remote_path,
+                dest,
+                skip_dirs=skip_dirs,
+                skip_files=skip_files,
+                dry_run=dry_run,
+                force=force,
+                path_map=path_map,
+                normalize_session=normalize_session,
+                normalize_subject=normalize_subject,
+                _mapped=_mapped,
+            )
+        return
+
     subdirs, files = list_subdirs_and_files(sftp, remote_path)
     subdirs = [d for d in subdirs if d not in skip_dirs]
 
@@ -409,15 +651,19 @@ def _naive_recursive(
     # File transfers at current depth                                    #
     # ------------------------------------------------------------------ #
     for fname in files:
-        src = os.path.join(remote_path, fname)
-        dst = os.path.join(local_path, fname)
-        if not force and os.path.exists(dst):
+        if fname in skip_files:
             continue
-        if dry_run:
-            logger.info("[DRY] Would GET %s → %s", src, dst)
-        else:
-            sftp.get(src, dst)
-            logger.info("GET %s → %s", src, dst)
+        src = os.path.join(remote_path, fname)
+        _transfer_file(
+            sftp,
+            src,
+            local_path,
+            fname,
+            normalize_session=normalize_session,
+            normalize_subject=normalize_subject,
+            force=force,
+            dry_run=dry_run,
+        )
 
     # ------------------------------------------------------------------ #
     # Recurse into sub-directories                                        #
@@ -428,6 +674,11 @@ def _naive_recursive(
             os.path.join(remote_path, sd),
             os.path.join(local_path, sd),
             skip_dirs=skip_dirs,
+            skip_files=skip_files,
             dry_run=dry_run,
             force=force,
+            path_map=path_map,
+            normalize_session=normalize_session,
+            normalize_subject=normalize_subject,
+            _mapped=_mapped,
         )

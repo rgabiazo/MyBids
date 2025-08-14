@@ -269,7 +269,7 @@ for mask_path in "${ROI_MASKS[@]}"; do
     # ----------------------------------------------------------------------
     for s in "${!PERROI_SESSIONS_DATA[@]}"; do
 
-        # Our final output dir for these TSVs
+        # Final output directory for these TSVs
         final_data_dir="$CSV_DATA_DIR/$GROUP_NAME"
         mkdir -p "$final_data_dir"
 

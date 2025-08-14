@@ -1,3 +1,5 @@
+"""CLI wrapper for running the BIDS validator."""
+
 from __future__ import annotations
 
 from pathlib import Path

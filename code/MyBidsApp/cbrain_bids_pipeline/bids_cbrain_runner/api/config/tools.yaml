@@ -20,12 +20,56 @@ tools:
         version: "1.3.2"
         tool_config_id: 5032
         bourreau_id: 23
+      rorqual:
+        version: "1.3.2"
+        tool_config_id: 8954
+        bourreau_id: 104
 
 
     keep_dirs:
       - config
       - logs
       - work
+    requires_subject_dir: true
+
+  fmriprep:
+    tool_id: 501
+    version: "23.0.2"
+    default_cluster: beluga
+    clusters:
+      beluga:
+        version: "23.0.2"
+        tool_config_id: 4538
+        bourreau_id: 56
+      cedar:
+        version: "23.0.2"
+        tool_config_id: 4532
+        bourreau_id: 23
+      rorqual:
+        version: "23.0.2"
+        tool_config_id: 8909
+        bourreau_id: 104
+    keep_dirs:
+      - config
+      - logs
+      - work
+
+  deepprep:
+    version: "24.1.2"
+    default_cluster: rorqual
+    clusters:
+      rorqual:
+        version: "24.1.2"
+        tool_config_id: 8894
+        bourreau_id: 104
+    keep_dirs:
+      - BOLD
+      - QC
+      - Recon
+      - WorkDir
+    subject_dirs:
+      - QC
+      - Recon
 
 #    # 3) Directories to skip entirely when flattening HippUnfold outputs.
 #    skip_dirs:

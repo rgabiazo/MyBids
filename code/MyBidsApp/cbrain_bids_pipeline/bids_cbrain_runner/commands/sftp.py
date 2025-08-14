@@ -1,5 +1,4 @@
-"""
-SFTP utilities for CBRAIN-BIDS pipelines.
+"""SFTP utilities for CBRAIN-BIDS pipelines.
 
 This module centralises low-level SFTP interactions used by
 ``cbrain-cli`` (alias ``bids-cbrain-cli``).  Responsibilities include:
@@ -42,37 +41,27 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 
 def sftp_connect_from_config(cfg: Dict[str, str]):
-    """Open an SFTP session based on *cfg*.
+    """Open an SFTP session based on ``cfg``.
 
-    Priority-order for credentials:
-    1. ``sftp_username`` / ``sftp_password`` keys in *cfg*
-    2. ``username`` / ``password`` keys in *cfg* (portal login)
-    3. ``CBRAIN_SFTP_USERNAME`` / ``CBRAIN_SFTP_PASSWORD`` environment
-    4. ``CBRAIN_USERNAME`` / ``CBRAIN_PASSWORD`` environment
+    Credential priority:
+        1. ``sftp_username`` / ``sftp_password`` keys in *cfg*
+        2. ``username`` / ``password`` keys in *cfg* (portal login)
+        3. ``CBRAIN_SFTP_USERNAME`` / ``CBRAIN_SFTP_PASSWORD`` environment
+        4. ``CBRAIN_USERNAME`` / ``CBRAIN_PASSWORD`` environment
 
     **Banner timeout**
+        The SSH banner wait time defaults to ~15 s. This limit can be extended
+        via a ``banner_timeout`` key in *servers.yaml* or the environment
+        variable ``CBRAIN_SFTP_BANNER_TIMEOUT``.
 
-    Some institutional firewalls or slower networks need more than the
-    default ~15 s to send the SSH banner.  The limit can be extended via
+    Args:
+        cfg: Dictionary from
+            :func:`bids_cbrain_runner.api.config_loaders.get_sftp_provider_config`.
 
-    * a ``banner_timeout`` key inside the provider block in *servers.yaml*, or
-    * the environment variable ``CBRAIN_SFTP_BANNER_TIMEOUT``.
-
-    Args
-    ----
-    cfg
-        Dictionary returned by
-        :pyfunc:`bids_cbrain_runner.api.config_loaders.get_sftp_provider_config`.
-
-    Returns
-    -------
-    tuple[paramiko.SSHClient | None, paramiko.SFTPClient | None]
-        * ``ssh_client`` – underlying SSH session (keep for later clean-up).
-        * ``sftp_client`` – active Paramiko SFTP channel.
-        If connection fails, ``(None, None)`` is returned and a log message
-        is emitted.
+    Returns:
+        Tuple ``(ssh_client, sftp_client)`` where each element may be ``None`` on
+        failure.
     """
-
     hostname: str | None = cfg.get("host")
     port: int = cfg.get("port", 22)
 
@@ -153,7 +142,6 @@ def list_subdirs_and_files(
         tuple[list[str], list[str]]: Sorted lists ``(subdirs, files)``.
         Empty lists are returned when the path is missing or unreadable.
     """
-
     try:
         contents = sftp_client.listdir(directory)
     except FileNotFoundError:
@@ -194,10 +182,9 @@ def _recurse_for_all_files(
 ) -> None:
     """Depth‑first traversal collecting *all* files under *current_dir*.
 
-    Builds *final_map* where keys are path fragments relative to the traversal
-    root (joined by ``/``) and values are lists of file names.
+    Builds *final_map* where keys are path fragments relative to the
+    traversal root (joined by ``/``) and values are lists of file names.
     """
-
     subdirs, files = list_subdirs_and_files(sftp_client, current_dir)
     final_map["/".join(partial_path)] = files
 
@@ -233,7 +220,6 @@ def navigate_and_list_files(
         list[str] | None: Sorted unique file names.  ``None`` signals an SFTP
         connection problem; an empty list means no match found.
     """
-
     ssh_client, sftp_client = sftp_connect_from_config(cfg)
     if not ssh_client or not sftp_client:
         return None
@@ -314,7 +300,6 @@ def _walk_sftp_tree(
     tree: Dict[str, Dict],
 ):
     """Recursive helper used by :pyfunc:`build_sftp_path_tree`."""
-
     # Base‑case: every pattern has been matched – recurse into *all* children.
     if step_index >= len(steps):
         _walk_all_remaining_sftp(sftp_client, current_dir, partial_path, tree)
@@ -355,7 +340,6 @@ def _walk_all_remaining_sftp(
     tree: Dict[str, Dict],
 ):
     """After all patterns matched, record every file and directory below."""
-
     subdirs, files = list_subdirs_and_files(sftp_client, dir_path)
     _insert_path(tree, path_parts, subdirs, files)
 
@@ -365,7 +349,10 @@ def _walk_all_remaining_sftp(
 
 
 def _insert_subdict(tree: Dict[str, Dict], path_parts: Sequence[str], subdict: Dict):
-    """Insert *subdict* at *path_parts* inside *tree* (creates parents as needed)."""
+    """Insert ``subdict`` at ``path_parts`` inside ``tree``.
+
+    Creates parent dictionaries as needed.
+    """
     current = tree
     for part in path_parts[:-1]:
         current = current.setdefault(part, {})
@@ -416,7 +403,10 @@ def sftp_cd_steps_with_group(
     group_id: int,
     steps: Sequence[str],
 ) -> None:
-    """Same as :pyfunc:`sftp_cd_steps` but restricted to *group_id* userfiles."""
+    """List directories via :pyfunc:`sftp_cd_steps`, restricted to a group.
+
+    Only include userfiles that belong to ``group_id``.
+    """
     ssh_client, sftp_client = sftp_connect_from_config(cfg)
     if not ssh_client or not sftp_client:
         return

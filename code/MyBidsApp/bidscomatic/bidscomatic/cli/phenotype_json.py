@@ -1,3 +1,5 @@
+"""CLI helpers for generating phenotype JSON metadata."""
+
 from __future__ import annotations
 
 import json

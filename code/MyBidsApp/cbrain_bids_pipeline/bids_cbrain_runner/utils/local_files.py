@@ -1,5 +1,4 @@
-"""
-Local‑filesystem helpers that mirror the interface of the SFTP utilities.
+"""Local‑filesystem helpers that mirror the interface of the SFTP utilities.
 
 These helpers provide a *uniform* tree‑building API for local paths so that the
 same comparison logic can be applied to both local and remote (SFTP) datasets.
@@ -46,7 +45,7 @@ def local_build_path_tree(
     *,
     ignore_globs: Iterable[str] = DEFAULT_IGNORE_GLOBS,
 ) -> Dict[str, object]:
-    """Return a nested mapping that mirrors wildcard traversal under *root_dir*.
+    """Return a nested mapping that mirrors wildcard traversal under ``root_dir``.
 
     Example::
 
@@ -234,10 +233,13 @@ def _insert_local_path(
 # -----------------------------------------------------------------------------
 
 def local_gather_all_matched_files(path_tree: Dict[str, object]) -> Dict[Tuple[str, ...], List[str]]:
-    """Return a mapping of *leaf* directory tuples → list of files.
+    """Return a mapping of directory tuples → list of files.
 
-    The function walks the *entire* tree and records files only for nodes with
-    **no** further sub‑directories (i.e. where ``subkeys == []``).
+    Unlike the previous implementation which only collected files from *leaf*
+    directories, this version records files for **all** directories encountered
+    in ``path_tree``.  This ensures that files sitting alongside further
+    sub‑directories (e.g. ``dataset_description.json`` at the root of a
+    derivative) are not skipped.
 
     Args:
         path_tree: Nested mapping produced by :pyfunc:`local_build_path_tree`.
@@ -258,14 +260,12 @@ def _recursive_collect_files(
     path_stack: List[str],
     results: MutableMapping[Tuple[str, ...], List[str]],
 ) -> None:
-    """Helper walking *node* depth‑first to populate *results*."""
+    """Walk *node* depth-first to populate *results*."""
     subkeys: List[str] = [k for k in node.keys() if not k.startswith("_")]
 
-    if not subkeys:
-        files = node.get("_files", [])  # type: ignore[arg-type]
-        if files:
-            results[tuple(path_stack)] = files  # type: ignore[assignment]
-        return
+    files = node.get("_files", [])  # type: ignore[arg-type]
+    if files:
+        results[tuple(path_stack)] = files  # type: ignore[assignment]
 
     for sk in subkeys:
         _recursive_collect_files(node[sk], path_stack + [sk], results)  # type: ignore[index]

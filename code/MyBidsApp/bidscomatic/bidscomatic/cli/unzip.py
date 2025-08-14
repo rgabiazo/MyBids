@@ -1,9 +1,7 @@
-"""
-Extract study archives (ZIP/TAR/…) and optionally delete them or the DICOM
-folders they create.
+"""Extract study archives and optionally delete them or the DICOM folders they create.
 
 The command is exposed as ``bidscomatic-cli unzip`` and is designed to run
-*before* any conversion step.  A confirmation prompt is displayed before
+before any conversion step. A confirmation prompt is displayed before
 performing destructive deletions unless ``--yes`` is passed.
 
 Key flags

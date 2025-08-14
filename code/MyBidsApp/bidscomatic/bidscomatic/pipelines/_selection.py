@@ -1,6 +1,4 @@
-"""
-Shared heuristics for selecting the best NIfTI run(s) out of a set of
-candidates that belong to the same phase-encode direction.
+"""Shared heuristics for selecting the best NIfTI runs from a candidate set.
 
 Selection rules
 ---------------

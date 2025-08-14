@@ -1,5 +1,4 @@
-"""
-High-level helpers for querying and manipulating *Userfile* records.
+"""High-level helpers for querying and manipulating *Userfile* records.
 
 This module provides small, stateless wrappers around the REST-level helpers
 (:pymod:`bids_cbrain_runner.api.client`) to keep the CLI implementation tidy.
@@ -281,8 +280,7 @@ def delete_userfile(
         dry_run: When ``True``, only log the intended deletion without
             contacting the server.
     """
-
-    # Retrieve the file name so that logs are informative.  Failure to fetch
+    # Retrieve the file name so that logs are informative. Failure to fetch
     # metadata is not fatal; deletion may still proceed.
     name = None
     try:
@@ -313,7 +311,6 @@ def delete_userfiles_by_group_and_type(
     timeout: float | None = None,
 ) -> None:
     """Delete all userfiles within a project that match ``filetypes``."""
-
     files = list_userfiles_by_group(
         client, group_id, per_page=per_page, timeout=timeout
     )

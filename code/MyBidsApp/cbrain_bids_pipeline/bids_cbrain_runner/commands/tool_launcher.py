@@ -1,5 +1,4 @@
-"""
-Tool-launching helpers used by *cbrain-cli* (alias *bids-cbrain-cli*).
+"""Tool-launching helpers used by *cbrain-cli* (alias *bids-cbrain-cli*).
 
 This module contains two thin wrappers around the OpenAPI façade
 (:class:`bids_cbrain_runner.api.client_openapi.CbrainClient`) that simplify
@@ -149,7 +148,7 @@ def launch_tool(
     client = CbrainClient(base_url, token)
 
     def _fetch_descriptor() -> dict:
-        """Retrieve the Boutiques descriptor for ``tool_config_id`` using the API."""
+        """Retrieve Boutiques descriptor for ``tool_config_id`` via API."""
         return client.fetch_boutiques_descriptor(tool_config_id)
 
     try:
@@ -275,6 +274,7 @@ def launch_tool_batch_for_group(
     tool_name: str,
     group_id: int,
     batch_type: Optional[str] = None,
+    userfile_ids: Optional[List[int]] = None,
     extra_params: Optional[Dict[str, Any]] = None,
     results_dp_id: Optional[int] = None,
     bourreau_id: Optional[int] = None,
@@ -293,6 +293,9 @@ def launch_tool_batch_for_group(
         group_id: Numeric project (``Group``) ID whose user-files are iterated.
         batch_type: Optional CBRAIN file-type filter
             (e.g. ``"BidsSubject"``).  **None** launches on *all* user-files.
+        userfile_ids: Explicit list of user-file IDs to process.  When set, only
+            those IDs present in ``group_id`` are launched.  Useful for
+            launching a single subject without enumerating the entire group.
         extra_params: Parameters merged into every individual *invoke* block.
         results_dp_id: Destination Data Provider for outputs.
         bourreau_id: Execution server to run on.
@@ -325,10 +328,14 @@ def launch_tool_batch_for_group(
     )
     if batch_type:
         userfiles = [uf for uf in userfiles if uf.get("type") == batch_type]
+    if userfile_ids is not None:
+        wanted = {int(uid) for uid in userfile_ids}
+        userfiles = [uf for uf in userfiles if int(uf.get("id")) in wanted]
 
     if not userfiles:
+        filt = f"type={batch_type}" if batch_type else "<any>"
         raise CbrainTaskError(
-            f"No user-files of type={batch_type or '<any>'} found in group={group_id}."
+            f"No user-files of {filt} found in group={group_id}."
         )
 
     # ------------------------------------------------------------------#
@@ -338,11 +345,22 @@ def launch_tool_batch_for_group(
         uf_id = uf["id"]
 
         # Build per-subject parameter overrides.
+        extra_ids = extra_params.get("interface_userfile_ids")
+        if extra_ids is None:
+            combined_ids = [uf_id]
+        else:
+            if not isinstance(extra_ids, (list, tuple)):
+                extra_ids = [extra_ids]
+            combined_ids = [uf_id] + list(extra_ids)
+
         batch_params: Dict[str, Any] = {
             **extra_params,
-            "interface_userfile_ids": [uf_id],
-            "subject_dir": uf_id,
+            "interface_userfile_ids": combined_ids,
         }
+        if tools_cfg.get(tool_name, {}).get("requires_subject_dir"):
+            batch_params["subject_dir"] = uf_id
+        if "bids_dir" not in batch_params:
+            batch_params["bids_dir"] = uf_id
 
         logger.info(
             "[BATCH %d] Launching '%s' (dry_run=%s)…",

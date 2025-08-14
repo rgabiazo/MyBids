@@ -1,6 +1,4 @@
-"""
-Helper functions for generating and maintaining the *participants.tsv* /
-*participants.json* pair required by the BIDS specification.
+"""Helper functions for generating and maintaining participants files.
 
 The module is split into five logical sections:
 
@@ -138,7 +136,6 @@ def apply_value_map(
         pandas.DataFrame: New DataFrame with replacements applied. Unknown
         columns are ignored with a warning.
     """
-
     df = df.copy()
     for col, replace_map in mapping.items():
         if col not in df.columns:

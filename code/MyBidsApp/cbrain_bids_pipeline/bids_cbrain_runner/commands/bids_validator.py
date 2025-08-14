@@ -91,16 +91,21 @@ def find_bids_root_upwards(start_path: os.PathLike) -> Optional[Path]:
     if current.is_file():
         current = current.parent
 
+    first_hit: Optional[Path] = None
+
     # Repeatedly ascend one directory level until reaching filesystem root.
     while True:
         dd_file = current / "dataset_description.json"
         logger.debug("Checking for BIDS root: %s", dd_file)
         if dd_file.is_file():
-            return current
+            if first_hit is None:
+                first_hit = current
+            if "derivatives" not in current.parts:
+                return current
 
         parent = current.parent
         if parent == current:  # Reached filesystem root.
             break
         current = parent
 
-    return None
+    return first_hit

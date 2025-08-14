@@ -2,8 +2,10 @@
 Package-level logging configuration.
 
 * Rich console output (colourised, nicely formatted).
-* Rotating **JSON** log file inside ``code/logs/`` when a dataset root is
-  known (or ``$BIDSCOMATIC_LOG_DIR`` when set).
+* Rotating **JSON** log file inside the package ``logs/`` folder when a dataset
+  root is present (or ``$BIDSCOMATIC_LOG_DIR`` when set). If the package is
+  located under ``<dataset_root>/code``, logs are stored alongside it; otherwise
+  they fall back to ``<dataset_root>/code/logs``.
 * Optional plain-text mirror controlled via ``--save-logfile`` on the CLI.
 
 The public helper :func:`setup_logging` wires everything and should be the
@@ -44,18 +46,27 @@ def _json_file_handler(dataset_root: Path | None, level: int) -> logging.Handler
 
     Returns:
         Configured :class:`logging.Handler` writing rotating JSON logs either
-        under ``dataset_root/code/logs``, the directory specified via the
-        ``BIDSCOMATIC_LOG_DIR`` environment variable or the package-local
-        ``logs/`` folder when no dataset root is supplied.
+        alongside the installed package under ``<dataset_root>/code`` or under
+        ``<dataset_root>/code/logs`` when the package lives elsewhere. The
+        directory can also be overridden via ``BIDSCOMATIC_LOG_DIR`` or falls
+        back to the package-local ``logs/`` folder when no dataset root is
+        supplied.
     """
     env_dir = os.environ.get("BIDSCOMATIC_LOG_DIR")
+    pkg_root = Path(__file__).resolve().parents[1]
 
     if env_dir:
         logdir = Path(env_dir).expanduser()
     elif dataset_root is not None:
-        logdir = dataset_root / "code" / "logs"
+        root = dataset_root.expanduser().resolve()
+        code_root = root / "code"
+        try:
+            rel = pkg_root.relative_to(code_root)
+            logdir = code_root / rel / "logs"
+        except ValueError:
+            logdir = code_root / "logs"
     else:
-        logdir = Path(__file__).resolve().parents[1] / "logs"
+        logdir = pkg_root / "logs"
     logdir.mkdir(parents=True, exist_ok=True)
 
     handler = logging.handlers.RotatingFileHandler(

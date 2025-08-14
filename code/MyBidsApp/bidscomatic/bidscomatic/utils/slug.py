@@ -1,7 +1,6 @@
-"""
-Slug-cleaning helpers used while merging DICOM series with identical
-`SeriesDescription` strings.  All dataset-specific suffixes live in the project
-configuration file **`series.yaml → slug_cleanup.suffixes`**.
+"""Slug-cleaning helpers for merging DICOM series with identical descriptions.
+
+All dataset-specific suffixes live in ``series.yaml → slug_cleanup.suffixes``.
 
 Public surface
 --------------
