@@ -166,11 +166,13 @@ def launch_tool(
     # 5. Construct default parameters from descriptor                       #
     # ---------------------------------------------------------------------#
     defaults: Dict[str, Any] = {}
+    input_ids = set()
     for inp in inputs:
         inp_id = inp.get("id")
         if not inp_id:
             # Skip anonymous inputs (should not happen in valid descriptors).
             continue
+        input_ids.add(inp_id)
 
         # Flags → default to string '0' (Boutiques convention for false).
         if inp.get("type") == "Flag":
@@ -185,17 +187,20 @@ def launch_tool(
             defaults[inp_id] = dv
 
     # Overlay command-line overrides *after* descriptor defaults.
-    invoke_params = {**defaults, **(extra_params or {})}
+    combined_params = {**defaults, **(extra_params or {})}
 
     # ---------------------------------------------------------------------#
-    # 6. Extract user-file IDs from *invoke*                                #
+    # 6. Extract user-file IDs and separate non-Boutiques params            #
     # ---------------------------------------------------------------------#
-    interface_ids: Optional[List[str]] = invoke_params.pop("interface_userfile_ids", None)
+    interface_ids: Optional[List[str]] = combined_params.pop("interface_userfile_ids", None)
     if interface_ids is not None and not isinstance(interface_ids, (list, tuple)):
         # Guarantee list-like type expected by CBRAIN.
         interface_ids = [interface_ids]
     if interface_ids is not None:
         interface_ids = [str(i) for i in interface_ids]
+
+    invoke_params = {k: v for k, v in combined_params.items() if k in input_ids}
+    cbrain_params = {k: v for k, v in combined_params.items() if k not in input_ids}
 
     # ---------------------------------------------------------------------#
     # 7. Validate required (non-optional) inputs                            #
@@ -225,6 +230,7 @@ def launch_tool(
         group_id=group_id,
         results_dp_id=results_dp_id,
         bourreau_id=bourreau_id,
+        non_invoke_params=cbrain_params,
     )
 
     # ---------------------------------------------------------------------#

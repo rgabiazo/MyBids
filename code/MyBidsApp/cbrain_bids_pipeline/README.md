@@ -1,7 +1,7 @@
 # cbrain\_bids\_pipeline
 
 > **One-command bridge between a local BIDS dataset and the [CBRAIN](https://github.com/aces/cbrain) neuro‑informatics platform.**
-> *Currently ships with first‑class support for **HippUnfold** and **fMRIPrep**; more CBRAIN tools will be added in future minor releases.*
+> *Currently ships with first‑class support for **HippUnfold**, **fMRIPrep**, and **DeepPrep**; more CBRAIN tools will be added in future minor releases.*
 
 ---
 
@@ -103,18 +103,44 @@ tools:
       beluga:
         tool_config_id: 5035
         bourreau_id: 56
+      cedar:
+        tool_config_id: 5032
+        bourreau_id: 23
+      rorqual:
+        tool_config_id: 8954
+        bourreau_id: 104
     keep_dirs: [config, logs, work]
-  fmriprep:
+  FMRIprepBidsSubject:
     version: "23.0.2"
     default_cluster: beluga
     clusters:
       beluga:
         tool_config_id: 4538
         bourreau_id: 56
+      cedar:
+        tool_config_id: 4532
+        bourreau_id: 23
+      fir:
+        tool_config_id: 10658
+        bourreau_id: 110
       rorqual:
         tool_config_id: 8909
         bourreau_id: 104
     keep_dirs: [config, logs, work]
+  deepprep:
+    version: "24.1.2"
+    default_cluster: rorqual
+    clusters:
+      fir:
+        tool_config_id: 10697
+        bourreau_id: 110
+      nibi:
+        tool_config_id: 9920
+        bourreau_id: 107
+      rorqual:
+        tool_config_id: 8894
+        bourreau_id: 104
+    keep_dirs: [BOLD, QC, Recon, WorkDir]
 ```
 
 **`defaults.yaml`** – Where derivatives land inside the BIDS tree
@@ -123,8 +149,8 @@ tools:
 cbrain:
   hippunfold:
     hippunfold_output_dir: derivatives/hippunfold
-  fmriprep:
-    fmriprep_output_dir: derivatives/fmriprep
+  FMRIprepBidsSubject:
+    FMRIprepBidsSubject_output_dir: derivatives/fmriprep
 ```
 
 
@@ -157,7 +183,7 @@ CBRAIN_USERNAME=alice@example.com CBRAIN_PASSWORD=•••••••• \
 | **Upload** & register                | [`cbrain-cli --upload-bids-and-sftp-files sub-* --upload-register --upload-dp-id 51`](#uploading) |
 | **Preview upload**                   | [`cbrain-cli --upload-bids-and-sftp-files sub-* --upload-dp-id 51 --upload-dry-run`](#uploading) |
 | **Launch** HippUnfold on project MyTrial | [`cbrain-cli --launch-tool hippunfold --group-id MyTrial --param modality=T1w`](#launching) |
-| **Launch** fMRIPrep on project DemoBids | [`cbrain-cli --launch-tool fmriprep --group-id DemoBids`](#launching) |
+| **Launch** fMRIPrep on project DemoBids | [`cbrain-cli --launch-tool FMRIprepBidsSubject --group-id DemoBids`](#launching) |
 | **Launch** DeepPrep on project NeuroPilot | [`cbrain-cli --launch-tool deepprep --group-id NeuroPilot --tool-param bold_task_type=rest`](#launching) |
 | **Download** derivatives             | [`cbrain-cli download --tool hippunfold --group MyTrial --flatten --skip-dirs config logs work`](#downloading) |
 | **Monitor** a task                   | `cbrain-cli --task-status 456789` |
@@ -206,9 +232,12 @@ Found 1 group:
  - ID=42 name=DemoProject desc='demo project'
 
 $ cbrain-cli --list-exec-servers
-Found 2 execution servers:
- - ID=10 name='ClusterA' online=True read_only=False
- - ID=11 name='ClusterB' online=True read_only=False
+Found 5 execution servers:
+ - ID=56 name='beluga' online=True read_only=False
+ - ID=23 name='cedar' online=True read_only=False
+ - ID=110 name='fir' online=True read_only=False
+ - ID=107 name='nibi' online=True read_only=False
+ - ID=104 name='rorqual' online=True read_only=False
 
 $ cbrain-cli --list-userfiles-provider 51
 Found 2 userfile(s) on provider 51.
@@ -515,27 +544,33 @@ Task created for 'hippunfold' on cluster 'rorqual':
 #### fMRIPrep – batch
 
 ```bash
-cbrain-cli --launch-tool fmriprep \
-    --tool-param interface_userfile_ids='[8100]' \
-    --tool-param fs_license_file=8100 \
-    --tool-param output_spaces='["T1w","MNI152NLin2009cAsym:res-2"]' \
-    --launch-tool-batch-group DemoProject \
+cbrain-cli --launch-tool FMRIprepBidsSubject \
+    --tool-param interface_userfile_ids='[7201]' \
+    --tool-param fs_license_file=7201 \
+    --tool-param output_spaces='["MNI152NLin6Asym","MNI152NLin2009cAsym:res-2"]' \
+    --tool-param anat_only=true \
+    --tool-param low_mem=true \
+    --tool-param no_reconall=true \
+    --launch-tool-batch-group BrainProject \
     --launch-tool-batch-type BidsSubject \
-    --launch-tool-bourreau-id 56 \
+    --launch-tool-bourreau-id 110 \
     --launch-tool-results-dp-id 51
 ```
 
 ```console
-$ cbrain-cli --launch-tool fmriprep \
-    --tool-param interface_userfile_ids='[8100]' \
-    --tool-param fs_license_file=8100 \
-    --tool-param output_spaces='["T1w","MNI152NLin2009cAsym:res-2"]' \
-    --launch-tool-batch-group DemoProject \
+$ cbrain-cli --launch-tool FMRIprepBidsSubject \
+    --tool-param interface_userfile_ids='[7201]' \
+    --tool-param fs_license_file=7201 \
+    --tool-param output_spaces='["MNI152NLin6Asym","MNI152NLin2009cAsym:res-2"]' \
+    --tool-param anat_only=true \
+    --tool-param low_mem=true \
+    --tool-param no_reconall=true \
+    --launch-tool-batch-group BrainProject \
     --launch-tool-batch-type BidsSubject \
-    --launch-tool-bourreau-id 56 \
+    --launch-tool-bourreau-id 110 \
     --launch-tool-results-dp-id 51
 INFO: token retrieved for user@example.com
-Task created for 'fmriprep' on cluster 'beluga':
+Task created for 'FMRIprepBidsSubject' on cluster 'fir':
 {
   "id": 234567,
   "type": "BoutiquesTask::FMRIprepBidsSubject",
@@ -546,64 +581,39 @@ Task created for 'fmriprep' on cluster 'beluga':
 #### fMRIPrep – single userfile
 
 ```bash
-cbrain-cli --launch-tool fmriprep \
-    --group-id DemoProject \
-    --tool-param interface_userfile_ids='[9100,8100]' \
-    --tool-param bids_dir=8100 \
-    --tool-param fs_license_file=9100 \
-    --tool-param output_spaces='["T1w"]' \
+cbrain-cli --launch-tool FMRIprepBidsSubject \
+    --group-id BrainProject \
+    --tool-param interface_userfile_ids='[7201,8201]' \
+    --tool-param bids_dir=8201 \
+    --tool-param fs_license_file=7201 \
+    --tool-param output_dir_name=sub-001-run1 \
+    --tool-param output_spaces='["MNI152NLin6Asym","MNI152NLin2009cAsym:res-2"]' \
+    --tool-param anat_only=true \
+    --tool-param low_mem=true \
+    --tool-param no_reconall=true \
     --launch-tool-batch-type BidsSubject \
-    --launch-tool-bourreau-id 23 \
+    --launch-tool-bourreau-id 110 \
     --launch-tool-results-dp-id 51
 ```
 
 ```console
-$ cbrain-cli --launch-tool fmriprep \
-    --group-id DemoProject \
-    --tool-param interface_userfile_ids='[9100,8100]' \
-    --tool-param bids_dir=8100 \
-    --tool-param fs_license_file=9100 \
-    --tool-param output_spaces='["T1w"]' \
+$ cbrain-cli --launch-tool FMRIprepBidsSubject \
+    --group-id BrainProject \
+    --tool-param interface_userfile_ids='[7201,8201]' \
+    --tool-param bids_dir=8201 \
+    --tool-param fs_license_file=7201 \
+    --tool-param output_dir_name=sub-001-run1 \
+    --tool-param output_spaces='["MNI152NLin6Asym","MNI152NLin2009cAsym:res-2"]' \
+    --tool-param anat_only=true \
+    --tool-param low_mem=true \
+    --tool-param no_reconall=true \
     --launch-tool-batch-type BidsSubject \
-    --launch-tool-bourreau-id 23 \
+    --launch-tool-bourreau-id 110 \
     --launch-tool-results-dp-id 51
 INFO: token retrieved for user@example.com
-Task created for 'fmriprep' on cluster 'cedar':
+Task created for 'FMRIprepBidsSubject' on cluster 'fir':
 {
   "id": 234568,
-  "type": "BoutiquesTask::FMRIprepBidsSubject",
-  ...
-}
-```
-
-#### fMRIPrep – rorqual
-
-```bash
-cbrain-cli --launch-tool fmriprep \
-    --group-id DemoProject \
-    --tool-param interface_userfile_ids='[9100,8100]' \
-    --tool-param bids_dir=8100 \
-    --tool-param fs_license_file=9100 \
-    --tool-param output_spaces='["T1w"]' \
-    --launch-tool-batch-type BidsSubject \
-    --launch-tool-bourreau-id 104 \
-    --launch-tool-results-dp-id 51
-```
-
-```console
-$ cbrain-cli --launch-tool fmriprep \
-    --group-id DemoProject \
-    --tool-param interface_userfile_ids='[9100,8100]' \
-    --tool-param bids_dir=8100 \
-    --tool-param fs_license_file=9100 \
-    --tool-param output_spaces='["T1w"]' \
-    --launch-tool-batch-type BidsSubject \
-    --launch-tool-bourreau-id 104 \
-    --launch-tool-results-dp-id 51
-INFO: token retrieved for user@example.com
-Task created for 'fmriprep' on cluster 'rorqual':
-{
-  "id": 234569,
   "type": "BoutiquesTask::FMRIprepBidsSubject",
   ...
 }
@@ -628,26 +638,28 @@ done
 cbrain-cli --launch-tool deepprep \
     --launch-tool-batch-group PilotStudy \
     --launch-tool-batch-type BidsSubject \
-    --launch-tool-bourreau-id 88 \
-    --launch-tool-results-dp-id 42 \
+    --launch-tool-bourreau-id 110 \
+    --launch-tool-results-dp-id 51 \
     --tool-param interface_userfile_ids='[8123]' \
     --tool-param fs_license_file=8123 \
     --tool-param bold_task_type=rest \
-    --tool-param output_dir_name='{full_noex}-{task_id}'
+    --tool-param output_dir_name="{full_noex}-{task_id}" \
+    --tool-param cbrain_enable_output_cache_cleaner=false
 ```
 
 ```console
 $ cbrain-cli --launch-tool deepprep \\
     --launch-tool-batch-group PilotStudy \\
     --launch-tool-batch-type BidsSubject \\
-    --launch-tool-bourreau-id 88 \\
-    --launch-tool-results-dp-id 42 \\
+    --launch-tool-bourreau-id 110 \\
+    --launch-tool-results-dp-id 51 \\
     --tool-param interface_userfile_ids='[8123]' \\
     --tool-param fs_license_file=8123 \\
     --tool-param bold_task_type=rest \\
-    --tool-param output_dir_name='{full_noex}-{task_id}'
+    --tool-param output_dir_name="{full_noex}-{task_id}" \\
+    --tool-param cbrain_enable_output_cache_cleaner=false
 INFO: token retrieved for user@example.com
-Task created for 'deepprep' on cluster 'dragon':
+Task created for 'deepprep' on cluster 'fir':
 {
   "id": 345678,
   "type": "BoutiquesTask::DeepPrep",
@@ -664,9 +676,10 @@ cbrain-cli --launch-tool deepprep \
     --tool-param bids_dir=8124 \
     --tool-param fs_license_file=8123 \
     --tool-param bold_task_type=rest \
-    --tool-param output_dir_name='{full_noex}-{task_id}' \
-    --launch-tool-bourreau-id 88 \
-    --launch-tool-results-dp-id 42
+    --launch-tool-bourreau-id 110 \
+    --launch-tool-results-dp-id 51 \
+    --tool-param output_dir_name="{full_noex}-{task_id}" \
+    --tool-param cbrain_enable_output_cache_cleaner=false
 ```
 
 ```console
@@ -676,11 +689,12 @@ $ cbrain-cli --launch-tool deepprep \\
     --tool-param bids_dir=8124 \\
     --tool-param fs_license_file=8123 \\
     --tool-param bold_task_type=rest \\
-    --tool-param output_dir_name='{full_noex}-{task_id}' \\
-    --launch-tool-bourreau-id 88 \\
-    --launch-tool-results-dp-id 42
+    --launch-tool-bourreau-id 110 \\
+    --launch-tool-results-dp-id 51 \\
+    --tool-param output_dir_name="{full_noex}-{task_id}" \\
+    --tool-param cbrain_enable_output_cache_cleaner=false
 INFO: token retrieved for user@example.com
-Task created for 'deepprep' on cluster 'dragon':
+Task created for 'deepprep' on cluster 'fir':
 {
   "id": 345679,
   "type": "BoutiquesTask::DeepPrep",
@@ -688,7 +702,7 @@ Task created for 'deepprep' on cluster 'dragon':
 }
 ```
 
-> **Note:** DeepPrep tasks may fail on some clusters due to out-of-memory errors. Use `cbrain-cli --error-recover <task_id>` to retry without re-uploading inputs.
+> **Note:** DeepPrep tasks may fail on some clusters due to out-of-memory errors. Use `cbrain-cli --error-recover <task_id>` to retry without re-uploading inputs, or `cbrain-cli --error-recover-failed MyProj --task-type DeepPrep` to re-run failed DeepPrep tasks for a project without uploading inputs again.
 
 Launches can target either a **single userfile** or an entire project. Use
 `--group-id PROJECT` together with `--tool-param interface_userfile_ids=UFID`
@@ -767,12 +781,24 @@ numeric ID and the project name. The command also understands:
   under the subject/session hierarchy;
 * `--skip-dirs <NAME ...>` – ignore unwanted folders such as `logs` or
   `work`.
+* `--only-dirs <PATTERN ...>` – restrict downloads to matching paths
+  (e.g. `sub-*/figures` or `sub-*/ses-*/anat`).
+* `--output-dir NAME` – store results under `derivatives/NAME` instead of
+  the default derived from `--output-type` or configuration.
 * `--download-path-map REMOTE=LOCAL` – place a remote directory under a
   different relative path (may be provided multiple times);
 * `--normalize session` – ensure filenames inside session folders include
   the session label.
 * `--normalize subject` – ensure filenames include the subject label.
 * `--normalize session subject` – apply both subject and session labels.
+
+For example, to place fMRIPrep results under `derivatives/DeepPrep/BOLD`:
+
+```bash
+bids-cbrain-cli download --tool FMRIprepBidsSubject \
+    --output-type FmriPrepOutput --group DemoProject \
+    --output-dir DeepPrep/BOLD --flatten --skip-dirs logs
+```
 
 Example directory tree after a flattened download:
 
@@ -812,13 +838,16 @@ Or apply it after downloading derivatives:
 
 ```bash
 cbrain-cli download --tool deepprep \
-    --alias derivatives DeepPrep BOLD "6cat=assocmemory" \
+    --alias derivatives DeepPrep BOLD sub-* ses-* func "6cat=assocmemory" \
     --group DemoProject
 ```
 
-The optional `sub-*`, `ses-*` and `func` placeholders from earlier versions
-are ignored; the alias command automatically descends into the usual
-`sub-*/ses-*/func` hierarchy.
+The optional `sub-*` and `ses-*` placeholders are ignored when determining the
+base directory, allowing the command to automatically descend into the
+`sub-*/ses-*` hierarchy.  Any path components that follow these placeholders
+(e.g. `func`, `anat` or `fmap`) restrict aliasing to that subdirectory.  If no
+such component is given, all session subdirectories are searched, and datasets
+without sessions are handled transparently.
 
 ### Deleting
 

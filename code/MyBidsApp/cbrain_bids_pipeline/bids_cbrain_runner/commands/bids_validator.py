@@ -1,5 +1,4 @@
-"""
-Lightweight wrapper around the Node-based **bids-validator** CLI.
+"""Lightweight wrapper around the Node-based **bids-validator** CLI.
 
 The helpers here locate the BIDS dataset root relative to a partial
 path, invoke the external validator, and return a Boolean pass/fail

@@ -112,7 +112,7 @@ tools:
         tool_config_id: 8954
         bourreau_id: 104
     keep_dirs: [config, logs, work]
-  fmriprep:
+  FMRIprepBidsSubject:
     version: "23.0.2"
     default_cluster: beluga
     clusters:
@@ -127,8 +127,8 @@ tools:
 cbrain:
   hippunfold:
     hippunfold_output_dir: derivatives/hippunfold
-  fmriprep:
-    fmriprep_output_dir: derivatives/fmriprep
+  FMRIprepBidsSubject:
+    FMRIprepBidsSubject_output_dir: derivatives/fmriprep
 filetype_inference:
   fallback: BidsSubject
   patterns:

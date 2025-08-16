@@ -130,7 +130,7 @@ def test_flattened_download_no_wrapper(monkeypatch, tmp_path):
         sftp=sftp,
         remote_dir="/uf/sub-002-2908862",
         local_root=str(tmp_path),
-        tool_name="fmriprep",
+        tool_name="FMRIprepBidsSubject",
         keep_dirs=["logs"],
         skip_files=["dataset_description.json"],
         wrapper="fmriprep",

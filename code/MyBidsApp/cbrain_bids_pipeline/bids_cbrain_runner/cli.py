@@ -698,6 +698,12 @@ def main() -> None:
         ),
     )
     dl.add_argument(
+        "--output-dir",
+        dest="output_dir_name",
+        metavar="NAME",
+        help="Destination directory inside derivatives for downloaded files.",
+    )
+    dl.add_argument(
         "--id",
         type=int,
         dest="userfile_id",
@@ -734,6 +740,14 @@ def main() -> None:
         nargs="+",
         default=[],
         help="File names to skip (e.g., dataset_description.json).",
+    )
+    dl.add_argument(
+        "--only-dirs",
+        dest="only_dirs",
+        nargs="+",
+        default=[],
+        metavar="PATTERN",
+        help="Only download directories matching these glob patterns.",
     )
     dl.add_argument(
         "--force",
@@ -1367,11 +1381,10 @@ def main() -> None:
                     print(f"Group '{args.group_id}' not found")
                     sys.exit(1)
             out_type = args.output_type
-            out_name = None
-            if out_type and "=" in out_type:
-                out_type, out_name = out_type.split("=", 1)
-                if not out_name:
-                    out_name = out_type
+            out_name = args.output_dir_name
+            if out_type and "=" in out_type and out_name is None:
+                out_type, legacy_name = out_type.split("=", 1)
+                out_name = legacy_name or out_type
             path_map: dict[str, list[str]] = {}
             for key, val in args.download_path_map:
                 path_map.setdefault(key, []).append(val)
@@ -1392,6 +1405,7 @@ def main() -> None:
                 path_map=path_map,
                 normalize_session=normalize_session,
                 normalize_subject=normalize_subject,
+                include_dirs=args.only_dirs,
                 dry_run=args.dry_run,
                 force=args.force_download,
                 timeout=args.timeout,

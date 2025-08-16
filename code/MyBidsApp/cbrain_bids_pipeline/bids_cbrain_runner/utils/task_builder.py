@@ -98,6 +98,7 @@ def build_task_payload(
     group_id: Optional[int] = None,
     results_dp_id: Optional[int] = None,
     bourreau_id: Optional[int] = None,
+    non_invoke_params: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Assemble a JSON‑serialisable dict compatible with CBRAIN’s /tasks API.
 
@@ -110,6 +111,10 @@ def build_task_payload(
         group_id: Optional project ID to which the task should belong.
         results_dp_id: Optional data‑provider ID where results are stored.
         bourreau_id: Optional execution server override.
+        non_invoke_params: Mapping of CBRAIN-specific parameters that should
+            live alongside ``invoke`` within the ``params`` block rather than
+            inside it.  Examples include flags such as
+            ``cbrain_enable_output_cache_cleaner``.
 
     Returns:
         A ``dict`` ready to be serialised to JSON and POST‑ed to CBRAIN.
@@ -141,6 +146,9 @@ def build_task_payload(
         "tool_config_id": tool_config_id,
         "params": {"invoke": invoke},
     }
+
+    if non_invoke_params:
+        payload["params"].update(non_invoke_params)
 
     # Optional fields – added only when supplied -------------------------------
     if interface_userfile_ids:

@@ -32,7 +32,7 @@ tools:
       - work
     requires_subject_dir: true
 
-  fmriprep:
+  FMRIprepBidsSubject:
     tool_id: 501
     version: "23.0.2"
     default_cluster: beluga
@@ -45,6 +45,10 @@ tools:
         version: "23.0.2"
         tool_config_id: 4532
         bourreau_id: 23
+      fir:
+        version: "23.0.2"
+        tool_config_id: 10658
+        bourreau_id: 110
       rorqual:
         version: "23.0.2"
         tool_config_id: 8909
@@ -58,6 +62,14 @@ tools:
     version: "24.1.2"
     default_cluster: rorqual
     clusters:
+      fir:
+        version: "24.1.2"
+        tool_config_id: 10697
+        bourreau_id: 110
+      nibi:
+        version: "24.1.2"
+        tool_config_id: 9920
+        bourreau_id: 107
       rorqual:
         version: "24.1.2"
         tool_config_id: 8894

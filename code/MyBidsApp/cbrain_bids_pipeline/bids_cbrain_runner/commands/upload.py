@@ -1,5 +1,4 @@
-"""
-Upload a subset of a local BIDS dataset to a CBRAIN-accessible SFTP server.
+"""Upload a subset of a local BIDS dataset to a CBRAIN-accessible SFTP server.
 
 High-level algorithm
 --------------------
@@ -21,25 +20,25 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Dict, Iterable, List, Mapping, Sequence, Tuple
 from pathlib import Path
+from typing import Dict, List, Mapping, Sequence, Tuple
 
+from ..api.config_loaders import load_pipeline_config
+from ..utils.compare import compare_local_remote_files
+from ..utils.filetypes import guess_filetype
 from ..utils.local_files import (
     local_build_path_tree,
     local_gather_all_matched_files,
 )
-from ..utils.compare import compare_local_remote_files
 from ..utils.output import print_jsonlike_dict
-from ..utils.filetypes import guess_filetype
 from ..utils.paths import (
     build_remote_path,
     infer_derivatives_root_from_steps,
     remap_path_tuple,
 )
-from ..api.config_loaders import load_pipeline_config
 from .bids_validator import bids_validator_cli, find_bids_root_upwards
-from .sftp import sftp_connect_from_config, list_subdirs_and_files
 from .data_providers import register_files_on_provider
+from .sftp import list_subdirs_and_files, sftp_connect_from_config
 from .userfiles import find_userfile_id_by_name_and_provider, update_userfile_group_and_move
 
 logger = logging.getLogger(__name__)
@@ -214,7 +213,11 @@ def upload_bids_and_sftp_files(
                     top_folder = path_tuple[0]
             else:
                 top_folder = None
-            local_subpath = dataset_root if is_direct_file else os.path.join(dataset_root, *path_tuple)
+            local_subpath = (
+                dataset_root
+                if is_direct_file
+                else os.path.join(dataset_root, *path_tuple)
+            )
 
             logger.info("[UPLOAD] Scanning local path: %s", local_subpath)
 
@@ -439,33 +442,23 @@ def ensure_remote_dir_structure(
     cfg: Mapping[str, object] | None = None,
     base_dir: str | None = None,
 ) -> bool:
-    """Create *path_tuple* recursively on the SFTP server if absent.
+    """Create directories on the SFTP server as needed.
 
-    Behaviour change
-    ----------------
-    If the **final component** looks like an actual file (``"." in name`` **and**
-    the file exists locally), it is *ignored* for directory creation.  This
-    allows commands such as::
+    The function ignores the final component when it refers to an existing
+    local file, enabling commands such as ``cbrain-cli --upload-bids-and-sftp-files
+    dataset_description.json`` to place the JSON at ``/dataset_description.json``
+    instead of creating a directory of that name.
 
-        cbrain-cli --upload-bids-and-sftp-files dataset_description.json …
+    Args:
+        sftp_client: Active :class:`paramiko.SFTPClient` instance.
+        path_tuple: Positional components relative to the SFTP root (e.g.
+            ``('sub-001', 'ses-01', 'anat')``).
+        cfg: Optional configuration dictionary providing the derivatives root.
+        base_dir: Base directory for building the remote path. Defaults to the
+            current directory of the SFTP client.
 
-    to place the JSON at ``/dataset_description.json`` instead of creating a
-    directory of that name.
-
-    Args
-    ----
-    sftp_client
-        Active :class:`paramiko.SFTPClient` instance.
-    path_tuple
-        Positional components relative to the SFTP root
-        (e.g. ``('sub-001', 'ses-01', 'anat')``).
-    cfg
-        Optional configuration dictionary providing the derivatives root.
-
-    Returns
-    -------
-    bool
-        ``True`` if **any** directory was created, otherwise ``False``.
+    Returns:
+        bool: ``True`` if any directory was created; otherwise ``False``.
     """
     import os
 

@@ -73,3 +73,32 @@ def test_download_output_type_override(monkeypatch):
     assert dl_calls[0]["output_type"] == "FileCollection"
     assert dl_calls[0]["output_dir_name"] == "DeepPrep"
 
+
+def test_download_output_dir_flag(monkeypatch):
+    cli_mod = _setup_common(monkeypatch)
+    monkeypatch.setattr(cli_mod, "resolve_group_id", lambda *a, **k: 7)
+
+    dl_calls = []
+    monkeypatch.setattr(cli_mod, "download_tool_outputs", lambda **kw: dl_calls.append(kw))
+
+    argv = [
+        "prog",
+        "download",
+        "--tool",
+        "hippunfold",
+        "--group",
+        "7",
+        "--output-type",
+        "FileCollection",
+        "--output-dir",
+        "DeepPrep/BOLD",
+    ]
+    monkeypatch.setattr(sys, "argv", argv)
+
+    with pytest.raises(SystemExit):
+        cli_mod.main()
+
+    assert dl_calls
+    assert dl_calls[0]["output_type"] == "FileCollection"
+    assert dl_calls[0]["output_dir_name"] == "DeepPrep/BOLD"
+

@@ -1,4 +1,4 @@
-"""bids_cbrain_runner.commands.download.
+"""Download CBRAIN-generated derivative folders via SFTP.
 
 Utilities for downloading CBRAIN-generated derivative folders via SFTP
 into a local BIDS-formatted dataset.
@@ -63,6 +63,7 @@ def download_tool_outputs(
     flatten: bool = True,
     skip_dirs: Sequence[str] | None = None,
     skip_files: Sequence[str] | None = None,
+    include_dirs: Sequence[str] | None = None,
     path_map: Mapping[str, Sequence[str]] | None = None,
     normalize_session: bool = False,
     normalize_subject: bool = False,
@@ -102,6 +103,8 @@ def download_tool_outputs(
             ``tools.yaml``).
         skip_files: Filenames to ignore during the transfer (merged with any
             ``skip_files`` declared for *tool_name* in ``tools.yaml``).
+        include_dirs: Glob patterns restricting the download to matching
+            relative paths.
         path_map: Mapping of directory names to alternative destination paths
             relative to their parent directory.
         normalize_session: When *True*, ensure filenames include the session
@@ -123,6 +126,7 @@ def download_tool_outputs(
     """
     skip_dirs = list(skip_dirs or [])  # ensure mutability
     skip_files = list(skip_files or [])
+    include_dirs = list(include_dirs or [])
 
     # ------------------------------------------------------------------#
     # 1) Determine the expected CBRAIN *type* for this tool              #
@@ -246,12 +250,13 @@ def download_tool_outputs(
     for uf in userfiles:
         remote_root = f"/{uf['name']}"
         logger.info(
-            "Downloading %s → %s  (flatten=%s, skip_dirs=%s, skip_files=%s, dry_run=%s, force=%s)",
+            "Downloading %s → %s  (flatten=%s, skip_dirs=%s, skip_files=%s, include_dirs=%s, dry_run=%s, force=%s)",
             remote_root,
             outdir,
             flatten,
             final_skip,
             final_skip_files,
+            include_dirs,
             dry_run,
             force,
         )
@@ -268,6 +273,7 @@ def download_tool_outputs(
                 skip_files=final_skip_files,
                 wrapper=local_name,
                 path_map=path_map,
+                include_dirs=include_dirs,
                 normalize_session=normalize_session,
                 normalize_subject=normalize_subject,
                 dry_run=dry_run,
@@ -280,6 +286,7 @@ def download_tool_outputs(
                 local_root=outdir,
                 skip_dirs=final_skip,
                 skip_files=final_skip_files,
+                 include_dirs=include_dirs,
                 path_map=path_map,
                 normalize_session=normalize_session,
                 normalize_subject=normalize_subject,

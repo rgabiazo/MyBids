@@ -32,7 +32,8 @@ from __future__ import annotations
 import json
 import logging
 import os
-from pathlib import Path
+from fnmatch import fnmatch
+from pathlib import Path, PurePosixPath
 from typing import Mapping, MutableMapping, Sequence, Set
 
 import yaml  # noqa: F401 – retained for potential future YAML writes
@@ -94,6 +95,39 @@ def _normalize_subject_name(directory: str, fname: str) -> str:
         return re.sub(r"sub-[^_]+", sub, fname)
 
     return f"{sub}_{fname}"
+
+
+def _path_matches(rel_path: str, patterns: Sequence[str]) -> bool:
+    """Return *True* if *rel_path* shares a prefix with any glob in *patterns*.
+
+    The check considers both ancestor and descendant relationships using
+    component-wise glob matching.  An empty *patterns* sequence always
+    evaluates to *False*; callers should short-circuit accordingly when no
+    filtering is desired.
+    """
+
+    rel_parts = PurePosixPath(rel_path).parts
+    for pat in patterns:
+        pat_parts = PurePosixPath(pat).parts
+        min_len = min(len(rel_parts), len(pat_parts))
+        if all(fnmatch(rel_parts[i], pat_parts[i]) for i in range(min_len)):
+            return True
+    return False
+
+
+def should_include(rel_path: str, patterns: Sequence[str] | None) -> bool:
+    """Decide whether *rel_path* should be processed given *patterns*.
+
+    When *patterns* is empty or *None* the function always returns *True*.
+    Otherwise the relative path is allowed only if it matches or is a prefix of
+    any provided glob pattern.
+    """
+
+    if not patterns:
+        return True
+    if rel_path in ("", "."):
+        return True
+    return _path_matches(rel_path, patterns)
 
 
 def _transfer_file(
@@ -171,13 +205,14 @@ def resolve_output_dir(
     Notes:
         The function never raises on missing config keys; it silently falls
         back to the default location.  Any *unexpected* exception while
-        parsing *config_dict* is logged but does not abort execution.
+        parsing *config_dict* is logged but does not abort execution.  When
+        *output_dir_name* is provided it **always** takes precedence over
+        configuration-derived locations.
     """
-    # Default location beneath <BIDS_ROOT>/derivatives
-    out_name = output_dir_name or tool_name
-    out_dir = os.path.join(bids_root, "derivatives", out_name)
+    # Start with the default <BIDS_ROOT>/derivatives/<tool_name>
+    out_dir = os.path.join(bids_root, "derivatives", tool_name)
 
-    # Attempt to honour an explicit override from the YAML configuration
+    # Honour an explicit override from the YAML configuration
     try:
         if config_dict:
             tool_conf = config_dict.get("cbrain", {}).get(tool_name, {})
@@ -188,6 +223,14 @@ def resolve_output_dir(
                 )
     except Exception as exc:  # noqa: BLE001 – diagnostic only
         logger.warning("Could not parse config for %s output directory: %s", tool_name, exc)
+
+    # Finally, allow a CLI-supplied output directory to override everything
+    if output_dir_name:
+        out_dir = (
+            output_dir_name
+            if os.path.isabs(output_dir_name)
+            else os.path.join(bids_root, "derivatives", output_dir_name)
+        )
 
     # Create the directory tree when needed
     if not dry_run and (force or not os.path.exists(out_dir)):
@@ -288,6 +331,7 @@ def flattened_download(
     subject_dirs: Sequence[str] | None = None,
     wrapper: str | None = None,
     path_map: Mapping[str, Sequence[str]] | None = None,
+    include_dirs: Sequence[str] | None = None,
     normalize_session: bool = False,
     normalize_subject: bool = False,
     dry_run: bool = False,
@@ -328,6 +372,8 @@ def flattened_download(
             *tool_name* when *None*.
         path_map: Mapping of directory names to alternative destination paths
             relative to their parent.
+        include_dirs: Glob patterns restricting the download to specific
+            remote paths.
         normalize_session: If *True*, ensure filenames include the session
             label of their containing directory.
         normalize_subject: If *True*, ensure filenames include the subject
@@ -355,6 +401,8 @@ def flattened_download(
     # Immediate listing of remote_dir
     subdirs, files = list_subdirs_and_files(sftp, remote_dir)
     subdirs = [d for d in subdirs if d not in skip_dirs_set]
+    subdirs = [d for d in subdirs if should_include(d, include_dirs)]
+    files = [f for f in files if should_include(f, include_dirs)]
 
     # ------------------------------------------------------------------ #
     # Derive sub- and ses- identifiers                                  #
@@ -389,6 +437,8 @@ def flattened_download(
     if wrapper_present:
         mapping[wrapper] = primary
         for kd in keep_dirs_set - {wrapper}:
+            if not should_include(kd, include_dirs):
+                continue
             mapping[kd] = (
                 os.path.join(local_root, kd, sub, ses)
                 if sub and ses
@@ -398,6 +448,8 @@ def flattened_download(
         for sd in [d for d in subdirs if d.startswith("sub-")]:
             mapping[sd] = os.path.join(local_root, sd)
         for kd in keep_dirs_set:
+            if not should_include(kd, include_dirs):
+                continue
             base = os.path.join(local_root, kd)
             if kd in subject_dirs_set and sub:
                 mapping[kd] = (
@@ -445,6 +497,9 @@ def flattened_download(
                 for fname in root_files:
                     if fname in skip_files_set:
                         continue
+                    rel_file = os.path.join(sd, fname)
+                    if not should_include(rel_file, include_dirs):
+                        continue
                     src_file = os.path.join(orig_src, fname)
                     dest_dir = base_dest if fname == "dataset_description.json" else dst
                     _transfer_file(
@@ -469,6 +524,8 @@ def flattened_download(
                     path_map=path_map,
                     normalize_session=normalize_session,
                     normalize_subject=normalize_subject,
+                    include_dirs=include_dirs,
+                    root_path=remote_dir,
                 )
                 root_subdirs = [d for d in root_subdirs if d != sub]
                 for inner in root_subdirs:
@@ -483,6 +540,8 @@ def flattened_download(
                         path_map=path_map,
                         normalize_session=normalize_session,
                         normalize_subject=normalize_subject,
+                        include_dirs=include_dirs,
+                        root_path=remote_dir,
                     )
                 continue
         
@@ -497,11 +556,16 @@ def flattened_download(
             path_map=path_map,
             normalize_session=normalize_session,
             normalize_subject=normalize_subject,
+            include_dirs=include_dirs,
+            root_path=remote_dir,
         )
 
         if sd in keep_dirs_set and src != orig_src:
             for fname in root_files:
                 if fname in skip_files_set:
+                    continue
+                rel_file = os.path.join(sd, fname)
+                if not should_include(rel_file, include_dirs):
                     continue
                 src_file = os.path.join(orig_src, fname)
                 _transfer_file(
@@ -517,6 +581,8 @@ def flattened_download(
 
     for fname in files:
         if fname in skip_files_set:
+            continue
+        if not should_include(fname, include_dirs):
             continue
         src = os.path.join(remote_dir, fname)
         _transfer_file(
@@ -537,13 +603,14 @@ def naive_download(
     local_root: str | Path,
     *,
     skip_dirs: Sequence[str] | None = None,
-        skip_files: Sequence[str] | None = None,
-        path_map: Mapping[str, Sequence[str]] | None = None,
-        normalize_session: bool = False,
-        normalize_subject: bool = False,
-        dry_run: bool = False,
-        force: bool = False,
-    ) -> None:
+    skip_files: Sequence[str] | None = None,
+    include_dirs: Sequence[str] | None = None,
+    path_map: Mapping[str, Sequence[str]] | None = None,
+    normalize_session: bool = False,
+    normalize_subject: bool = False,
+    dry_run: bool = False,
+    force: bool = False,
+) -> None:
     """Recursively mirror *remote_dir* under *local_root*.
 
     This strategy copies the remote hierarchy **verbatim**—no flattening
@@ -555,6 +622,7 @@ def naive_download(
         local_root: Local directory that becomes the root of the mirror.
         skip_dirs: Sub-directories to skip entirely during recursion.
         skip_files: File names to ignore during recursion.
+        include_dirs: Glob patterns restricting which paths are downloaded.
         path_map: Optional mapping of directory names to alternative
             destination paths relative to their parent.  When a directory is
             mapped to multiple locations, extra locations are created as
@@ -576,11 +644,13 @@ def naive_download(
         dest,
         skip_dirs=set(skip_dirs or []),
         skip_files=set(skip_files or []),
+        include_dirs=include_dirs,
         dry_run=dry_run,
         force=force,
         path_map=mapping,
         normalize_session=normalize_session,
         normalize_subject=normalize_subject,
+        root_path=remote_dir,
     )
 
 
@@ -599,6 +669,8 @@ def _naive_recursive(
     path_map: Mapping[str, Sequence[str]] | None = None,
     normalize_session: bool = False,
     normalize_subject: bool = False,
+    include_dirs: Sequence[str] | None = None,
+    root_path: str | None = None,
     _mapped: Set[str] | None = None,
 ) -> None:
     """Depth-first copy of *remote_path* → *local_path*.
@@ -613,6 +685,10 @@ def _naive_recursive(
         path_map: Remapping rules for directory names.
         normalize_session: Ensure filenames match the session directory.
         normalize_subject: Ensure filenames include the subject directory.
+        include_dirs: Optional glob patterns restricting traversal to matching
+            relative paths.
+        root_path: Anchor for relative path computation; defaults to the first
+            ``remote_path`` provided.
         _mapped: Internal set tracking which remote paths have been remapped.
 
     Notes:
@@ -620,6 +696,10 @@ def _naive_recursive(
         monitoring of long transfers.
     """
     _mapped = _mapped or set()
+    root_path = root_path or remote_path
+    rel_path = os.path.relpath(remote_path, root_path).replace("\\", "/")
+    if not should_include(rel_path, include_dirs):
+        return
     base_name = os.path.basename(remote_path)
     if path_map and base_name in path_map and remote_path not in _mapped:
         _mapped.add(remote_path)
@@ -637,6 +717,8 @@ def _naive_recursive(
                 path_map=path_map,
                 normalize_session=normalize_session,
                 normalize_subject=normalize_subject,
+                include_dirs=include_dirs,
+                root_path=root_path,
                 _mapped=_mapped,
             )
         return
@@ -652,6 +734,9 @@ def _naive_recursive(
     # ------------------------------------------------------------------ #
     for fname in files:
         if fname in skip_files:
+            continue
+        file_rel = os.path.join(rel_path, fname).lstrip("./")
+        if not should_include(file_rel, include_dirs):
             continue
         src = os.path.join(remote_path, fname)
         _transfer_file(
@@ -669,6 +754,9 @@ def _naive_recursive(
     # Recurse into sub-directories                                        #
     # ------------------------------------------------------------------ #
     for sd in subdirs:
+        sub_rel = os.path.join(rel_path, sd).lstrip("./")
+        if not should_include(sub_rel, include_dirs):
+            continue
         _naive_recursive(
             sftp,
             os.path.join(remote_path, sd),
@@ -680,5 +768,7 @@ def _naive_recursive(
             path_map=path_map,
             normalize_session=normalize_session,
             normalize_subject=normalize_subject,
+            include_dirs=include_dirs,
+            root_path=root_path,
             _mapped=_mapped,
         )

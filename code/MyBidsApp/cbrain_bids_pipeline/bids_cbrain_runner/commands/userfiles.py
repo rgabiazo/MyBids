@@ -70,7 +70,16 @@ def list_userfiles(
     *,
     timeout: float | None = None,
 ) -> List[Dict[str, object]]:
-    """Return every userfile accessible to the session."""
+    """Return all userfiles visible to the session.
+
+    Args:
+        client: Authenticated :class:`CbrainClient` instance.
+        per_page: Page size for REST pagination.
+        timeout: Optional HTTP timeout for each request.
+
+    Returns:
+        List of userfile dictionaries as provided by the API.
+    """
     return fetch_all_userfiles(
         client, per_page=per_page, timeout=timeout
     )
@@ -83,7 +92,17 @@ def list_userfiles_by_group(
     *,
     timeout: float | None = None,
 ) -> List[Dict[str, object]]:
-    """Filter userfiles by **project** (group) ID."""
+    """Return userfiles belonging to a specific project.
+
+    Args:
+        client: Authenticated :class:`CbrainClient` instance.
+        group_id: Project identifier used for filtering.
+        per_page: Page size for REST pagination.
+        timeout: Optional HTTP timeout for each request.
+
+    Returns:
+        List of userfile records within the given project.
+    """
     files = fetch_all_userfiles(
         client, per_page=per_page, timeout=timeout
     )
@@ -97,7 +116,17 @@ def list_userfiles_by_provider(
     *,
     timeout: float | None = None,
 ) -> List[Dict[str, object]]:
-    """Filter userfiles by **Data Provider** ID."""
+    """Return userfiles hosted on a specific Data Provider.
+
+    Args:
+        client: Authenticated :class:`CbrainClient` instance.
+        provider_id: Identifier of the Data Provider to match.
+        per_page: Page size for REST pagination.
+        timeout: Optional HTTP timeout for each request.
+
+    Returns:
+        List of userfile records stored on the given provider.
+    """
     files = fetch_all_userfiles(
         client, per_page=per_page, timeout=timeout
     )
@@ -112,7 +141,18 @@ def list_userfiles_by_group_and_provider(
     *,
     timeout: float | None = None,
 ) -> List[Dict[str, object]]:
-    """Filter userfiles by *both* project and provider IDs."""
+    """Return userfiles matching both project and provider filters.
+
+    Args:
+        client: Authenticated :class:`CbrainClient` instance.
+        group_id: Project identifier used for filtering.
+        provider_id: Data Provider identifier to match.
+        per_page: Page size for REST pagination.
+        timeout: Optional HTTP timeout for each request.
+
+    Returns:
+        List of userfile records satisfying both filters.
+    """
     files = fetch_all_userfiles(
         client, per_page=per_page, timeout=timeout
     )
@@ -132,11 +172,15 @@ def describe_userfile(
     *,
     timeout: float | None = None,
 ) -> None:
-    """Print a one-page summary for a specific *Userfile*.
+    """Print a one-page summary for a specific Userfile.
 
     Args:
-        client: Authenticated :class:`CbrainClient`.
+        client: Authenticated :class:`CbrainClient` instance.
         userfile_id: Numeric identifier for the userfile.
+        timeout: Optional HTTP timeout for the request.
+
+    Returns:
+        ``None``. Details are emitted via ``print`` statements.
     """
     try:
         uf = client.get_userfile(userfile_id, timeout=timeout)
@@ -205,6 +249,10 @@ def update_userfile_group_and_move(
         userfile_id: Numeric userfile identifier.
         new_group_id: Destination project (group) ID.
         new_provider_id: Destination Data Provider ID.
+        timeout: Optional HTTP timeout for each request.
+
+    Returns:
+        ``None``. Progress is logged via :pymod:`logging`.
     """
     # ------------------------------------------------------------------#
     # 1. Update group (project)                                          #

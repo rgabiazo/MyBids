@@ -1,13 +1,14 @@
-"""
-Helpers for the **CBRAIN** ``/data_providers`` API endpoints.
+"""Helpers for the CBRAIN ``/data_providers`` API endpoints.
 
-These thin wrappers simplify the most common interactions—listing
-providers, browsing their file trees, and registering new files—so the
-rest of the CLI does not repeat HTTP boilerplate.
+These thin wrappers simplify common interactions—listing providers,
+browsing their file trees, and registering new files—so the rest of the
+CLI does not repeat HTTP boilerplate.
 """
 
 from __future__ import annotations
+
 from typing import List
+
 from ..api.client import cbrain_get, cbrain_post
 
 
@@ -19,6 +20,7 @@ def list_data_providers(
     Args:
         base_url: Base CBRAIN portal URL, e.g. ``"https://portal.cbrain.mcgill.ca"``.
         token:    Valid ``cbrain_api_token`` with *read* access.
+        timeout:  Request timeout in seconds.
 
     Returns:
         ``None``.  Results are sent to ``stdout`` for immediate inspection.
@@ -55,6 +57,7 @@ def browse_provider(
         provider_id: Numeric Data Provider ID.
         path:        Optional sub-directory on the provider.  If ``None``,
                      the provider root is listed.
+        timeout:     Request timeout in seconds.
 
     Returns:
         A list of **FileInfo** dictionaries.  If an error occurs, an empty
@@ -102,9 +105,14 @@ def register_files_on_provider(
         browse_path:   Remote sub-directory containing the *basenames*.
         as_user_id:    Admin-only override to register files on behalf of another account.
         other_group_id:Project (group) ID to associate with the new Userfiles.
+        timeout:      Request timeout in seconds.
 
     Raises:
         ValueError: If *basenames* and *types* length mismatch.
+
+    Returns:
+        None.  Summaries of registration outcomes are printed for
+        verification.
 
     Notes:
         * CBRAIN expects the ``filetypes`` parameter in the form

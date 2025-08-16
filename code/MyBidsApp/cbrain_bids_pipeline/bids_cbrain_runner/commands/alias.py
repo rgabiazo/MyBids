@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, List, Sequence
 
@@ -25,6 +25,10 @@ class AliasSpec:
         ses: Optional session filter (e.g. ``"01"``).
         json_mode: Behaviour for JSON sidecars: ``"copy"`` (default),
             ``"link"`` or ``"skip"``.
+        inner: Optional path components within each session (or subject when
+            sessions are absent) that limit where aliasing occurs.  An empty
+            list means the search is performed recursively from the session
+            directory itself.
     """
 
     steps: List[str]
@@ -33,6 +37,7 @@ class AliasSpec:
     sub: str | None = None
     ses: str | None = None
     json_mode: str = "copy"
+    inner: List[str] = field(default_factory=list)
 
 
 def parse_alias_tokens(tokens: Sequence[str]) -> AliasSpec:
@@ -47,16 +52,25 @@ def parse_alias_tokens(tokens: Sequence[str]) -> AliasSpec:
     Raises:
         ValueError: If ``tokens`` are empty or malformed.
     """
-
     if not tokens:
         raise ValueError("--alias requires at least 'OLD=NEW'")
 
     *raw_steps, mapping = tokens
-    # Allow callers to include placeholders like "sub-*", "ses-*" or "func" for
-    # readability. These components do not correspond to real directories and
-    # would otherwise cause the base path to be misinterpreted. Strip any
-    # tokens containing wildcards as well as common BIDS hierarchy markers.
-    steps = [s for s in raw_steps if "*" not in s and s not in {"func"}]
+    # Interpret path components preceding the OLD=NEW mapping.  Tokens may
+    # include placeholders like ``sub-*`` or ``ses-*`` for readability.  Any
+    # components appearing after the first placeholder are treated as
+    # directories within each session (or subject when sessions are absent).
+    steps: List[str] = []
+    inner: List[str] = []
+    after_placeholder = False
+    for tok in raw_steps:
+        if "*" in tok:
+            after_placeholder = True
+            continue
+        if after_placeholder:
+            inner.append(tok)
+        else:
+            steps.append(tok)
 
     parts = [p.strip() for p in mapping.split(',') if p.strip()]
     if not parts or '=' not in parts[0]:
@@ -73,7 +87,7 @@ def parse_alias_tokens(tokens: Sequence[str]) -> AliasSpec:
     sub = opts.get('sub')
     ses = opts.get('ses')
 
-    return AliasSpec(list(steps), old, new, sub=sub, ses=ses, json_mode=json_mode)
+    return AliasSpec(list(steps), old, new, sub=sub, ses=ses, json_mode=json_mode, inner=inner)
 
 
 # ---------------------------------------------------------------------------
@@ -91,7 +105,6 @@ def _replace_strings(obj: object, old: str, new: str) -> object:
     Returns:
         The updated structure with substitutions applied.
     """
-
     if isinstance(obj, dict):
         return {k: _replace_strings(v, old, new) for k, v in obj.items()}
     if isinstance(obj, list):
@@ -108,7 +121,9 @@ def make_task_aliases(spec: AliasSpec, *, dry_run: bool = False) -> None:
     ``spec.steps`` and creates aliases for files with ``task-<old>`` in
     their name. Non-JSON files become relative symlinks. JSON sidecars
     are copied with in-content replacements or, optionally, linked or
-    skipped.
+    skipped. If ``spec.inner`` is provided, aliasing is restricted to that
+    path within each session (or subject when sessions are absent);
+    otherwise the search descends recursively from the session directory.
 
     Args:
         spec: Description of the alias operation.
@@ -117,7 +132,6 @@ def make_task_aliases(spec: AliasSpec, *, dry_run: bool = False) -> None:
     Returns:
         None.
     """
-
     base_dir = Path(os.getcwd())
     if spec.steps:
         base_dir = base_dir.joinpath(*spec.steps)
@@ -139,16 +153,17 @@ def make_task_aliases(spec: AliasSpec, *, dry_run: bool = False) -> None:
             ses_dirs = [sub_dir / f"ses-{spec.ses}"]
         else:
             ses_dirs = [p for p in sub_dir.glob('ses-*') if p.is_dir()]
+            if not ses_dirs:
+                ses_dirs = [sub_dir]
 
         for ses_dir in ses_dirs:
             if not ses_dir.is_dir():
                 continue
-            func_dir = ses_dir / 'func'
-            target_dir = func_dir if func_dir.is_dir() else ses_dir
+            target_dir = ses_dir.joinpath(*spec.inner) if spec.inner else ses_dir
             if not target_dir.is_dir():
                 continue
             logger.info("Processing %s", target_dir)
-            for src in target_dir.glob(f"*task-{spec.old}*"):
+            for src in target_dir.rglob(f"*task-{spec.old}*"):
                 dest_name = src.name.replace(f"task-{spec.old}", f"task-{spec.new}")
                 dest = src.parent / dest_name
                 if dest.exists():
@@ -190,7 +205,14 @@ def make_task_aliases(spec: AliasSpec, *, dry_run: bool = False) -> None:
 
 
 def run_aliases(specs: Iterable[AliasSpec], *, dry_run: bool = False) -> None:
-    """Execute a sequence of alias operations."""
+    """Execute a sequence of alias operations.
 
+    Args:
+        specs: Iterable of alias specifications to process.
+        dry_run: When ``True``, log intended actions without modifying files.
+
+    Returns:
+        None.
+    """
     for spec in specs:
         make_task_aliases(spec, dry_run=dry_run)

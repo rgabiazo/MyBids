@@ -24,8 +24,8 @@ def write_minimal_defaults(tmpdir):
             "hippunfold": {
                 "hippunfold_output_dir": "derivatives/custom_hippunfold"
             },
-            "fmriprep": {
-                "fmriprep_output_dir": "derivatives/custom_fmriprep"
+            "FMRIprepBidsSubject": {
+                "FMRIprepBidsSubject_output_dir": "derivatives/custom_fmriprep"
             }
         },
         "dataset_descriptions": {
@@ -50,7 +50,7 @@ def write_minimal_defaults(tmpdir):
                         }
                     ]
                 },
-                "fmriprep": {
+                "FMRIprepBidsSubject": {
                     "name": "Default fMRIPrep Name",
                     "bids_version": "1.10.0",
                     "dataset_type": "derivative",
@@ -86,8 +86,8 @@ def write_external_override(tmproot):
             "hippunfold": {
                 "hippunfold_output_dir": "derivatives/custom_hippunfold"
             },
-            "fmriprep": {
-                "fmriprep_output_dir": "derivatives/custom_fmriprep"
+            "FMRIprepBidsSubject": {
+                "FMRIprepBidsSubject_output_dir": "derivatives/custom_fmriprep"
             }
         },
         "dataset_descriptions": {
@@ -96,7 +96,7 @@ def write_external_override(tmproot):
                     "name": "Overridden Hippunfold Name",
                     "description": "This came from the external override."
                 },
-                "fmriprep": {
+                "FMRIprepBidsSubject": {
                     "name": "Overridden fMRIPrep Name",
                     "description": "This came from the external override."
                 }
@@ -152,17 +152,17 @@ def test_pipeline_config_and_description(tmp_path, monkeypatch, caplog):
     # Verify that the override was merged
     assert "cbrain" in cfg
     assert "hippunfold" in cfg["cbrain"]
-    assert "fmriprep" in cfg["cbrain"]
+    assert "FMRIprepBidsSubject" in cfg["cbrain"]
 
     # 5) Now test resolve_output_dir + maybe_write_dataset_description for both tools
     outdir = resolve_output_dir(str(bids_test), "hippunfold", cfg)
     assert outdir.endswith("derivatives/custom_hippunfold")
-    outdir_fmriprep = resolve_output_dir(str(bids_test), "fmriprep", cfg)
+    outdir_fmriprep = resolve_output_dir(str(bids_test), "FMRIprepBidsSubject", cfg)
     assert outdir_fmriprep.endswith("derivatives/custom_fmriprep")
 
     # 6) Write dataset_description.json into the new output folder for both
     maybe_write_dataset_description(outdir, "hippunfold", cfg, dry_run=False)
-    maybe_write_dataset_description(outdir_fmriprep, "fmriprep", cfg, dry_run=False)
+    maybe_write_dataset_description(outdir_fmriprep, "FMRIprepBidsSubject", cfg, dry_run=False)
 
     desc_file = os.path.join(outdir, "dataset_description.json")
     assert os.path.exists(desc_file)

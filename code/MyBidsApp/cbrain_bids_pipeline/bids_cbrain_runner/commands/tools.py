@@ -1,5 +1,4 @@
-"""
-Helpers for inspecting CBRAIN *Tool* and *ToolConfig* objects.
+"""Helpers for inspecting CBRAIN *Tool* and *ToolConfig* objects.
 
 The functions in this module wrap high-level ``CbrainClient`` calls and emit
 human-readable summaries via :pymod:`logging`.  No complex objects are returned
@@ -287,13 +286,13 @@ def fetch_all_tasks(
     """Return **all** tasks visible to the session.
 
     Args:
-        client:    Authenticated :class:`CbrainClient`.
-        per_page:  Pagination size used for ``/tasks``.
+        client: Authenticated :class:`CbrainClient`.
+        per_page: Pagination size used for ``/tasks``.
+        timeout: Optional HTTP timeout forwarded to the API.
 
     Returns:
         List of raw task dictionaries.
     """
-
     all_tasks: List[Dict[str, object]] = []
     page_num: int = 1
 
@@ -332,10 +331,17 @@ def list_tasks_by_group(
 ) -> List[Dict[str, object]]:
     """Filter tasks by project and, optionally, tool type.
 
-    ``task_type`` may be a case-insensitive prefix of the CBRAIN task
-    ``type`` field or a numeric ``tool_config_id``.
-    """
+    Args:
+        client: Authenticated :class:`CbrainClient`.
+        group_id: Project identifier to search within.
+        task_type: Case-insensitive prefix of the ``type`` field or a numeric
+            ``tool_config_id``.
+        per_page: Pagination size for ``/tasks``.
+        timeout: Optional HTTP timeout forwarded to the API.
 
+    Returns:
+        List of raw task dictionaries matching the filters.
+    """
     tasks = fetch_all_tasks(client, per_page=per_page, timeout=timeout)
 
     filtered = [t for t in tasks if t.get("group_id") == group_id]
@@ -367,14 +373,16 @@ def show_group_tasks_status(
     """Log the status of every task in ``group_id``.
 
     Args:
-        base_url:  CBRAIN portal root.
-        token:     ``cbrain_api_token``.
-        group_id:  Project identifier to search within.
+        base_url: CBRAIN portal root.
+        token: ``cbrain_api_token``.
+        group_id: Project identifier to search within.
         task_type: Restrict output to this tool type (optional).
-        per_page:  Pagination size for task queries.
-        timeout:   Optional HTTP timeout forwarded to the API.
-    """
+        per_page: Pagination size for task queries.
+        timeout: Optional HTTP timeout forwarded to the API.
 
+    Returns:
+        None.
+    """
     client = CbrainClient(base_url, token)
 
     tasks = list_tasks_by_group(
@@ -392,14 +400,26 @@ def show_group_tasks_status(
 
 
 def _is_failed(status: str) -> bool:
-    """Return ``True`` if *status* represents a failure state."""
+    """Determine whether a task status indicates failure.
 
+    Args:
+        status: CBRAIN task status string.
+
+    Returns:
+        ``True`` if the status represents a failure state.
+    """
     return "fail" in status.lower()
 
 
 def _is_recoverable(status: str) -> bool:
-    """Return ``True`` if *status* represents a recoverable error or failure state."""
+    """Determine whether a status is recoverable.
 
+    Args:
+        status: CBRAIN task status string.
+
+    Returns:
+        ``True`` if the status represents a recoverable error or failure state.
+    """
     status_lower = status.lower()
     return "error" in status_lower or "fail" in status_lower
 
@@ -414,11 +434,20 @@ def retry_task(
 ) -> None:
     """Request a retry of ``task_id`` if it is in a failed state.
 
-    The function first checks the task's status to avoid spurious API
-    calls on running or completed tasks.  Any HTTP or CBRAIN errors are
-    logged but do not raise exceptions.
-    """
+    The function first checks the task status to avoid spurious API calls on
+    running or completed tasks. Any HTTP or CBRAIN errors are logged but do not
+    raise exceptions.
 
+    Args:
+        base_url: CBRAIN portal root.
+        token: ``cbrain_api_token``.
+        task_id: Identifier of the task to retry.
+        timeout: Optional HTTP timeout forwarded to the API.
+        current_status: Known task status to skip an additional API query.
+
+    Returns:
+        None.
+    """
     client = CbrainClient(base_url, token)
     if current_status is None:
         try:
@@ -465,10 +494,20 @@ def retry_failed_tasks(
 ) -> None:
     """Retry every failed task within ``group_id``.
 
-    Tasks are filtered by *task_type* if provided.  Only entries whose
-    status contains ``"fail"`` (case-insensitive) trigger a retry.
-    """
+    Tasks are filtered by *task_type* if provided. Only entries whose status
+    contains ``"fail"`` (case-insensitive) trigger a retry.
 
+    Args:
+        base_url: CBRAIN portal root.
+        token: ``cbrain_api_token``.
+        group_id: Project identifier to search within.
+        task_type: Restrict retries to this tool type (optional).
+        per_page: Pagination size for task queries.
+        timeout: Optional HTTP timeout forwarded to the API.
+
+    Returns:
+        None.
+    """
     client = CbrainClient(base_url, token)
 
     tasks = list_tasks_by_group(
@@ -503,8 +542,18 @@ def error_recover_task(
     timeout: float | None = None,
     current_status: str | None = None,
 ) -> None:
-    """Trigger error recovery for ``task_id`` if in a failed or error state."""
+    """Trigger error recovery for ``task_id`` if in a failed or error state.
 
+    Args:
+        base_url: CBRAIN portal root.
+        token: ``cbrain_api_token``.
+        task_id: Identifier of the task to recover.
+        timeout: Optional HTTP timeout forwarded to the API.
+        current_status: Known task status to skip an additional API query.
+
+    Returns:
+        None.
+    """
     client = CbrainClient(base_url, token)
     if current_status is None:
         try:
@@ -539,8 +588,19 @@ def error_recover_failed_tasks(
     per_page: int = 100,
     timeout: float | None = None,
 ) -> None:
-    """Trigger error recovery for every task in ``group_id`` in failed or error state."""
+    """Trigger error recovery for every task in ``group_id`` in failed or error state.
 
+    Args:
+        base_url: CBRAIN portal root.
+        token: ``cbrain_api_token``.
+        group_id: Project identifier to search within.
+        task_type: Restrict recovery to this tool type (optional).
+        per_page: Pagination size for task queries.
+        timeout: Optional HTTP timeout forwarded to the API.
+
+    Returns:
+        None.
+    """
     client = CbrainClient(base_url, token)
 
     tasks = list_tasks_by_group(

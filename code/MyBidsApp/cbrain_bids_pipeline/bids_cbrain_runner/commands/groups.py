@@ -33,6 +33,7 @@ def list_groups(
         token: Valid API token with permission to list projects.
         page: Page number for server-side pagination.
         per_page: Items requested per page.
+        timeout: Request timeout in seconds.
 
     Returns:
         ``list[dict]`` — Each entry is a CBRAIN *Group* JSON object.
@@ -62,10 +63,11 @@ def describe_group(
     Args:
         base_url: CBRAIN portal URL.
         token: API token.
-        group_id: Numeric *id* of the group to describe.
+        group_id: Numeric identifier of the group to describe.
+        timeout: Request timeout in seconds.
 
-    Side Effects:
-        Writes formatted information to ``stdout``.
+    Returns:
+        None.  Formatted information is written to ``stdout``.
     """
     endpoint = f"groups/{group_id}"
     resp = cbrain_get(base_url, endpoint, token, timeout=timeout)
@@ -99,6 +101,7 @@ def describe_group_userfiles(
         base_url: CBRAIN portal URL.
         token: API token.
         group_id: Numeric group identifier.
+        timeout: Request timeout in seconds.
 
     Returns:
         ``list[dict]`` containing userfiles with keys ``id``, ``name`` and
@@ -143,6 +146,7 @@ def create_group(
             and spaces are allowed.
         description: Optional free‑form description.
         per_page: Pagination size used when checking for existing groups.
+        timeout: Request timeout in seconds.
 
     Returns:
         The JSON object describing the newly created group on success, or
@@ -198,6 +202,16 @@ def find_group_id_by_name(
 
     The helper iterates through ``/groups`` pages until the requested name is
     found or the end of the listing is reached.
+
+    Args:
+        base_url: CBRAIN portal URL.
+        token: API token.
+        name: Group name to search for.
+        per_page: Items requested per page.
+        timeout: Request timeout in seconds.
+
+    Returns:
+        Matching group ID if found; otherwise ``None``.
     """
     page = 1
     while True:
@@ -222,7 +236,18 @@ def resolve_group_id(
     per_page: int = 100,
     timeout: float | None = None,
 ) -> int | None:
-    """Coerce ``identifier`` (ID or name) to a numeric group ID."""
+    """Coerce ``identifier`` (ID or name) to a numeric group ID.
+
+    Args:
+        base_url: CBRAIN portal URL.
+        token: API token.
+        identifier: Numeric ID or group name to resolve.
+        per_page: Items requested per page when resolving names.
+        timeout: Request timeout in seconds.
+
+    Returns:
+        Numeric group ID when resolution succeeds; otherwise ``None``.
+    """
     if identifier is None:
         return None
 

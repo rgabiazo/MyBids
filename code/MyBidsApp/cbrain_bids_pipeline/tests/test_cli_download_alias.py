@@ -66,9 +66,11 @@ def test_alias_after_download_subcommand(monkeypatch):
 
     assert alias_specs
     spec = alias_specs[0][0]
-    # Wildcard components like 'sub-*', 'ses-*' and 'func' are ignored when
-    # determining the base directory for aliasing.
+    # Wildcard components like 'sub-*' and 'ses-*' are ignored when determining
+    # the base directory. Directories after them (e.g. 'func') are captured in
+    # ``spec.inner``.
     assert spec.steps == ["derivatives", "DeepPrep", "BOLD"]
+    assert spec.inner == ["func"]
     assert spec.old == "6cat"
     assert spec.new == "assocmemory"
 

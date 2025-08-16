@@ -238,7 +238,7 @@ def test_batch_launch_injects_bids_dir(monkeypatch):
         base_url="https://x",
         token="tok",
         tools_cfg={},
-        tool_name="fmriprep",
+        tool_name="FMRIprepBidsSubject",
         group_id=11,
         show_spinner=False,
     )

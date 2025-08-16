@@ -13,8 +13,8 @@ roots:
 cbrain:
   hippunfold:
     hippunfold_output_dir: "derivatives/hippunfold"
-  fmriprep:
-    fmriprep_output_dir: "derivatives/fmriprep"
+  FMRIprepBidsSubject:
+    FMRIprepBidsSubject_output_dir: "derivatives/fmriprep"
 
 # -------------------------------------------------------------------
 # 2) FSL-related defaults (common derivatives locations):
@@ -59,7 +59,7 @@ dataset_descriptions:
           codeURL: "https://github.com/aces/cbrain"
           description: "Used to execute hippunfold."
 
-    fmriprep:
+    FMRIprepBidsSubject:
       name: "fMRIPrep (via CBRAIN)"
       bids_version: "1.10.0"
       dataset_type: "derivative"

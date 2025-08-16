@@ -7,20 +7,52 @@ from bids_cbrain_runner.commands.alias import AliasSpec, make_task_aliases
 
 def test_make_task_aliases(tmp_path, monkeypatch):
     func = tmp_path / "sub-001" / "ses-01" / "func"
+    anat = tmp_path / "sub-001" / "ses-01" / "anat"
     func.mkdir(parents=True)
+    anat.mkdir(parents=True)
     (func / "sub-001_ses-01_task-foo_run-01_bold.nii.gz").write_text("data")
     (func / "sub-001_ses-01_task-foo_run-01_bold.json").write_text(
         json.dumps({"TaskName": "foo"})
     )
+    (anat / "sub-001_ses-01_task-foo_run-01_T1w.nii.gz").write_text("data")
 
     spec = AliasSpec([], "foo", "bar", sub="001", ses="01")
     monkeypatch.chdir(tmp_path)
     make_task_aliases(spec)
 
     assert (func / "sub-001_ses-01_task-bar_run-01_bold.nii.gz").is_symlink()
+    assert (anat / "sub-001_ses-01_task-bar_run-01_T1w.nii.gz").is_symlink()
     with open(func / "sub-001_ses-01_task-bar_run-01_bold.json") as fh:
         data = json.load(fh)
     assert data["TaskName"] == "bar"
+
+
+def test_make_task_aliases_restricted_dir(tmp_path, monkeypatch):
+    func = tmp_path / "sub-001" / "ses-01" / "func"
+    anat = tmp_path / "sub-001" / "ses-01" / "anat"
+    func.mkdir(parents=True)
+    anat.mkdir(parents=True)
+    (func / "sub-001_ses-01_task-foo_run-01_bold.nii.gz").write_text("data")
+    (anat / "sub-001_ses-01_task-foo_run-01_T1w.nii.gz").write_text("data")
+
+    spec = AliasSpec([], "foo", "bar", sub="001", ses="01", inner=["anat"])
+    monkeypatch.chdir(tmp_path)
+    make_task_aliases(spec)
+
+    assert (anat / "sub-001_ses-01_task-bar_run-01_T1w.nii.gz").is_symlink()
+    assert not (func / "sub-001_ses-01_task-bar_run-01_bold.nii.gz").exists()
+
+
+def test_make_task_aliases_no_session(tmp_path, monkeypatch):
+    func = tmp_path / "sub-001" / "func"
+    func.mkdir(parents=True)
+    (func / "sub-001_task-foo_run-01_bold.nii.gz").write_text("data")
+
+    spec = AliasSpec([], "foo", "bar", sub="001", inner=["func"])
+    monkeypatch.chdir(tmp_path)
+    make_task_aliases(spec)
+
+    assert (func / "sub-001_task-bar_run-01_bold.nii.gz").is_symlink()
 
 
 def test_make_task_aliases_dry_run(tmp_path, monkeypatch, caplog):
