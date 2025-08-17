@@ -5,11 +5,11 @@ MyBids is a comprehensive toolkit and example repository for working with neuroi
 1. **MyBidsApp** – a collection of Python packages providing command line tools
    for BIDS data (``bidscomatic-cli``, ``dicomatic-cli``, ``cbrain-cli``,
    and the ``bids`` umbrella).  These packages live in
-   ``MyBidsApp/``.  See the
-   [detailed MyBidsApp README](MyBidsApp/README.md) for installation
+   ``code/MyBidsApp/``.  See the
+   [detailed MyBidsApp README](code/MyBidsApp/README.md) for installation
    and usage instructions for each tool.
 2. **Shell scripts** – helper scripts for preprocessing and analysing neuroimaging
-   data with FSL, FreeSurfer and related utilities. Scripts reside in ``scripts/``
+   data with FSL, FreeSurfer and related utilities. Scripts reside in ``code/scripts/``
    and work with the BIDS dataset stored at the repository root. See the
    [Shell Scripts README](code/README.md#shell-scripts) for usage details.
 
