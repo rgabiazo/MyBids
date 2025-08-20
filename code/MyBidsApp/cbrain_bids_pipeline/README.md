@@ -74,11 +74,10 @@ This CLI and Python helper connect a local, BIDS‑structured dataset to CBRAIN.
 
 ## Installation
 
-Clone the repo and move into this subproject:
+Clone the repo:
 
 ```bash
 git clone https://github.com/rgabiazo/MyBids.git
-cd MyBids/code/MyBidsApp/cbrain_bids_pipeline
 ```
 
 Create and activate a virtual environment (optional but recommended):
