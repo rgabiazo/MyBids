@@ -545,10 +545,10 @@ cbrain-cli --error-recover-failed DemoProject --task-type hippunfold
 
 ### Downloading
 
-Retrieve derivatives (CLI supports `cbrain-cli download` and `bids-cbrain-cli download`):
+Retrieve derivatives (CLI supports `cbrain-cli download` and `cbrain-cli download`):
 
 ```bash
-bids-cbrain-cli download --tool hippunfold   --output-type HippunfoldOutput --group 42
+cbrain-cli download --tool hippunfold   --output-type HippunfoldOutput --group 42
 ```
 
 ```console
@@ -569,7 +569,7 @@ You can also fetch a **single** CBRAIN file via `--id <USERFILE>` (omit `--group
 Example (store fMRIPrep results under `derivatives/DeepPrep/BOLD`):
 
 ```bash
-bids-cbrain-cli download --tool FMRIprepBidsSubject   --output-type FmriPrepOutput --group DemoProject   --output-dir DeepPrep/BOLD --flatten --skip-dirs logs
+cbrain-cli download --tool FMRIprepBidsSubject   --output-type FmriPrepOutput --group DemoProject   --output-dir DeepPrep/BOLD --flatten --skip-dirs logs
 ```
 
 Example flattened tree:
