@@ -685,7 +685,7 @@ Thanks to the **McGill Centre for Integrative Neuroscience** and **Pierre Rioux*
 
 ## License
 
-`bidscomatic` is released under the **MIT License** – see the top‑level `LICENSE` file for details.
+This repo is released under the **MIT License** – see the top‑level `LICENSE` file for details.
 
 ---
 
