@@ -200,10 +200,11 @@ CBRAIN_USERNAME=alice@example.com CBRAIN_PASSWORD=•••••••• \
 | **Launch** fMRIPrep on project *DemoBids*                                             | `cbrain-cli --launch-tool FMRIprepBidsSubject --group-id DemoBids`                             |
 | **Launch** DeepPrep on project *NeuroPilot*                                           | `cbrain-cli --launch-tool deepprep --group-id NeuroPilot --tool-param bold_task_type=rest`     |
 | **Monitor** a task *(numeric IDs: checked as **project ID** first, else **task ID**)* | `cbrain-cli --task-status 456789`                                                              |
-| **List** HippUnfold tasks in a project                                                | `cbrain-cli --task-status MyTrial --task-type hipp`                                            |
+| **List** HippUnfold tasks in a project                                                | `cbrain-cli --task-status MyTrial --task-type hipppunfold`                                     |
 | **Retry** a failed task                                                               | `cbrain-cli --retry-task 456789`                                                               |
 | **Retry** all failed tasks in project                                                 | `cbrain-cli --retry-failed MyTrial`                                                            |
-| **Retry** failed HippUnfold tasks                                                     | `cbrain-cli --retry-failed MyTrial --task-type hipp`                                           |
+| **Retry** failed HippUnfold tasks                                                     | `cbrain-cli --retry-failed MyTrial --task-type hippunfold`                                     |
+| **Recover** failed on cluster HippUnfold tasks in a project                           | `cbrain-cli --error-recover-failed DemoProject --task-type hippunfold`                         |
 | **Download** derivatives                                                              | `cbrain-cli download --tool hippunfold --group MyTrial --flatten --skip-dirs config logs work` |
 | **Enable** verbose logs *(append to any command)*                                     | `--debug-logs`                                                                                 |
 | **Delete** a userfile                                                                 | `cbrain-cli --delete-userfile 123 --dry-delete`                                                |
