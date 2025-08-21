@@ -188,27 +188,26 @@ CBRAIN_USERNAME=alice@example.com CBRAIN_PASSWORD=•••••••• \
 
 ## Quick‑start cheatsheet
 
-| Task                                       | Command |
-| ------------------------------------------ | ------- |
-| **Validate** dataset                        | `cbrain-cli --bids-validator sub-* ses-*` |
-| **Compare** local vs. remote                | `cbrain-cli --check-bids-and-sftp-files sub-* ses-* anat` |
-| **Create project**                          | `cbrain-cli --create-group DemoProject --group-description "test dataset"` |
-| **Upload** & register                       | `cbrain-cli --upload-bids-and-sftp-files sub-* --upload-register --upload-dp-id 51` |
-| **Preview upload**                          | `cbrain-cli --upload-bids-and-sftp-files sub-* --upload-dp-id 51 --upload-dry-run` |
-| **Launch** HippUnfold on project *MyTrial*  | `cbrain-cli --launch-tool hippunfold --group-id MyTrial --param modality=T1w` |
-| **Launch** fMRIPrep on project *DemoBids*   | `cbrain-cli --launch-tool FMRIprepBidsSubject --group-id DemoBids` |
-| **Launch** DeepPrep on project *NeuroPilot* | `cbrain-cli --launch-tool deepprep --group-id NeuroPilot --tool-param bold_task_type=rest` |
-| **Download** derivatives                    | `cbrain-cli download --tool hippunfold --group MyTrial --flatten --skip-dirs config logs work` |
-| **Monitor** a task                          | `cbrain-cli --task-status 456789` |
-| **List HippUnfold tasks in a project**      | `cbrain-cli --task-status MyTrial --task-type hipp` |
-| **Retry a failed task**                     | `cbrain-cli --retry-task 456789` |
-| **Retry all failed tasks in project**       | `cbrain-cli --retry-failed MyTrial` |
-| **Retry failed HippUnfold tasks**           | `cbrain-cli --retry-failed MyTrial --task-type hipp` |
-| **Delete a userfile**                       | `cbrain-cli --delete-userfile 123 --dry-delete` |
-| **Purge filetype from project**             | `cbrain-cli --delete-group MyTrial --delete-filetype BidsSubject` |
-| **Create task alias**                       | `cbrain-cli --alias "6cat=assocmemory"` |
-
-> When `--task-status` receives a number, the CLI first checks if it matches a **project ID**; otherwise it treats it as a **task ID**. Add `--debug-logs` to any command for verbose output. 
+| Task                                                                                  | Command                                                                                        |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Validate** dataset                                                                  | `cbrain-cli --bids-validator sub-* ses-*`                                                      |
+| **Compare** local vs. remote                                                          | `cbrain-cli --check-bids-and-sftp-files sub-* ses-* anat`                                      |
+| **Create project**                                                                    | `cbrain-cli --create-group DemoProject --group-description "test dataset"`                     |
+| **Create** local task alias                                                           | `cbrain-cli --alias "6cat=assocmemory"`                                                       |
+| **Preview upload (dry‑run)**                                                          | `cbrain-cli --upload-bids-and-sftp-files sub-* --upload-dp-id 51 --upload-dry-run`             |
+| **Upload** & register                                                                 | `cbrain-cli --upload-bids-and-sftp-files sub-* --upload-register --upload-dp-id 51`            |
+| **Launch** HippUnfold on project *MyTrial*                                            | `cbrain-cli --launch-tool hippunfold --group-id MyTrial --param modality=T1w`                  |
+| **Launch** fMRIPrep on project *DemoBids*                                             | `cbrain-cli --launch-tool FMRIprepBidsSubject --group-id DemoBids`                             |
+| **Launch** DeepPrep on project *NeuroPilot*                                           | `cbrain-cli --launch-tool deepprep --group-id NeuroPilot --tool-param bold_task_type=rest`     |
+| **Monitor** a task *(numeric IDs: checked as **project ID** first, else **task ID**)* | `cbrain-cli --task-status 456789`                                                              |
+| **List** HippUnfold tasks in a project                                                | `cbrain-cli --task-status MyTrial --task-type hipp`                                            |
+| **Retry** a failed task                                                               | `cbrain-cli --retry-task 456789`                                                               |
+| **Retry** all failed tasks in project                                                 | `cbrain-cli --retry-failed MyTrial`                                                            |
+| **Retry** failed HippUnfold tasks                                                     | `cbrain-cli --retry-failed MyTrial --task-type hipp`                                           |
+| **Download** derivatives                                                              | `cbrain-cli download --tool hippunfold --group MyTrial --flatten --skip-dirs config logs work` |
+| **Enable** verbose logs *(append to any command)*                                     | `--debug-logs`                                                                                 |
+| **Delete** a userfile                                                                 | `cbrain-cli --delete-userfile 123 --dry-delete`                                                |
+| **Purge** filetype from project                                                       | `cbrain-cli --delete-group MyTrial --delete-filetype BidsSubject`                              |
 
 ---
 
