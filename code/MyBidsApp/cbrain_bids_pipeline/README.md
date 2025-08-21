@@ -180,7 +180,7 @@ export CBRAIN_TIMEOUT=60  # HTTP request timeout in seconds (default 60)
 For one‑off commands you can also inline credentials:
 
 ```bash
-CBRAIN_USERNAME=alice@example.com CBRAIN_PASSWORD=•••••••• \
+CBRAIN_USERNAME=alice@example.com CBRAIN_PASSWORD='your_password' \
   cbrain-cli --bids-validator sub-* ses-*
 ```
 
