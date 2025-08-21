@@ -193,7 +193,8 @@ CBRAIN_USERNAME=alice@example.com CBRAIN_PASSWORD=•••••••• \
 | **Validate** dataset                                                                  | `cbrain-cli --bids-validator sub-* ses-*`                                                      |
 | **Compare** local vs. remote                                                          | `cbrain-cli --check-bids-and-sftp-files sub-* ses-* anat`                                      |
 | **Create project**                                                                    | `cbrain-cli --create-group DemoProject --group-description "test dataset"`                     |
-| **Create** local task alias                                                           | `cbrain-cli --alias "6cat=assocmemory"`                                                       |
+| **Create** local task alias                                                           | `cbrain-cli --alias "6cat=assocmemory"`                                                        |
+| **Enable** verbose logs *(append to any command)*                                     | `cbrain-cli --debug-logs`                                                                      |
 | **Preview upload (dry‑run)**                                                          | `cbrain-cli --upload-bids-and-sftp-files sub-* --upload-dp-id 51 --upload-dry-run`             |
 | **Upload** & register                                                                 | `cbrain-cli --upload-bids-and-sftp-files sub-* --upload-register --upload-dp-id 51`            |
 | **Launch** HippUnfold on project *MyTrial*                                            | `cbrain-cli --launch-tool hippunfold --group-id MyTrial --param modality=T1w`                  |
@@ -204,9 +205,8 @@ CBRAIN_USERNAME=alice@example.com CBRAIN_PASSWORD=•••••••• \
 | **Retry** a failed task                                                               | `cbrain-cli --retry-task 456789`                                                               |
 | **Retry** all failed tasks in project                                                 | `cbrain-cli --retry-failed MyTrial`                                                            |
 | **Retry** failed HippUnfold tasks                                                     | `cbrain-cli --retry-failed MyTrial --task-type hippunfold`                                     |
-| **Recover** failed on cluster HippUnfold tasks in a project                           | `cbrain-cli --error-recover-failed DemoProject --task-type hippunfold`                         |
+| **Recover** all failed on cluster HippUnfold tasks in a project                       | `cbrain-cli --error-recover-failed DemoProject --task-type hippunfold`                         |
 | **Download** derivatives                                                              | `cbrain-cli download --tool hippunfold --group MyTrial --flatten --skip-dirs config logs work` |
-| **Enable** verbose logs *(append to any command)*                                     | `--debug-logs`                                                                                 |
 | **Delete** a userfile                                                                 | `cbrain-cli --delete-userfile 123 --dry-delete`                                                |
 | **Purge** filetype from project                                                       | `cbrain-cli --delete-group MyTrial --delete-filetype BidsSubject`                              |
 
