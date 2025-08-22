@@ -517,18 +517,7 @@ Task created for 'FMRIprepBidsSubject' on cluster 'fir':
 
 #### DeepPrep — batch
 
-DeepPrep expects BOLD runs whose task label is one of `6cat`, `rest`, `motor`, or `rest motor`. If your files use a different label, create symlinks and update the JSON `TaskName` so filenames contain one of these values:
-
-```bash
-cd /path/to/sub-123/ses-01/func
-for run in 01 02; do
-  ln -s sub-123_ses-01_task-mem_dir-AP_run-${run}_bold.nii.gz \
-        sub-123_ses-01_task-rest_dir-AP_run-${run}_bold.nii.gz
-  jq '.TaskName = "rest"' sub-123_ses-01_task-mem_dir-AP_run-${run}_bold.json \
-    > tmp.$$.json && mv tmp.$$.json \
-    sub-123_ses-01_task-rest_dir-AP_run-${run}_bold.json
-done
-```
+DeepPrep expects BOLD runs whose task label is one of `6cat`, `rest`, `motor`, or `rest motor`. If your files use a different label, create symlinks and update the JSON `TaskName` so filenames contain one of these values. You can use the `cbrain-cli --alias` command to automate this.
 
 ```bash
 cbrain-cli --launch-tool deepprep \
