@@ -142,7 +142,7 @@ def split_by_prefix(cols: Sequence[str]) -> Dict[str, Dict[str, List[str]]]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3  Frame generator – user-facing API
+# 3  Frame generator – public API
 # ─────────────────────────────────────────────────────────────────────────────
 def _merge_session_maps(
     master: MutableMapping[str, List[str]],

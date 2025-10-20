@@ -28,6 +28,36 @@ import click
 from bidscomatic.config import load_config
 from bidscomatic.utils.logging import setup_logging
 
+
+class LazyGroup(click.Group):
+    """Click group that imports sub-commands lazily."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialise the base class and prepare the lazy registry."""
+        self._lazy: dict[str, str] = {}
+        super().__init__(*args, **kwargs)
+
+    def set_lazy_command(self, name: str, target: str) -> None:
+        """Register *name* to be imported from ``target`` on first use."""
+
+        self._lazy[name] = target
+
+    def get_command(self, ctx, cmd_name):  # noqa: D401 - Click signature
+        """Resolve *cmd_name* from the eager map or import table."""
+        cmd = super().get_command(ctx, cmd_name)
+        if cmd is not None:
+            return cmd
+        target = self._lazy.get(cmd_name)
+        if not target:
+            return None
+        module_name, attr = target.split(":", 1)
+        import importlib
+
+        module = importlib.import_module(module_name)
+        cmd = getattr(module, attr)
+        self.add_command(cmd, name=cmd_name)
+        return cmd
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Context settings shared by the entire Click hierarchy
 # Show “-h/--help” and provide default values in the automatic help text.
@@ -43,6 +73,7 @@ _CTX: Dict[str, Any] = dict(
 # All sub-commands are attached via :pyfunc:`add_command` below.
 # ─────────────────────────────────────────────────────────────────────────────
 @click.group(
+    cls=LazyGroup,
     context_settings=_CTX,
     help="""\b
 bidscomatic-cli – BIDS toolkit.
@@ -140,32 +171,21 @@ def main(  # noqa: D401 – Click requires the callback to be named “main”.
         "debug":   debug,
     }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Sub-command registrations
-# Imports are placed *after* the Click group definition to avoid circular
-# dependencies during module import.
-# ─────────────────────────────────────────────────────────────────────────────
-from .unzip          import cli as unzip_cmd          # noqa: E402
-from .init           import cli as init_cmd           # noqa: E402
-from .convert        import cli as convert_cmd        # noqa: E402
-from .bids           import cli as bids_cmd           # noqa: E402
-from .participants   import cli as participants_cmd   # noqa: E402
-from .questionnaires import cli as questionnaires_cmd # noqa: E402
-from .phenotype_json import cli as phenotype_json_cmd # noqa: E402
-from .events         import cli as events_cmd         # noqa: E402
-from .dataset_description import cli as dataset_description_cmd  # noqa: E402
-from .validate       import cli as validate_cmd       # noqa: E402
-
-main.add_command(unzip_cmd)
-main.add_command(init_cmd)
-main.add_command(convert_cmd)
-main.add_command(bids_cmd)
-main.add_command(participants_cmd)
-main.add_command(questionnaires_cmd)
-main.add_command(phenotype_json_cmd)
-main.add_command(events_cmd)
-main.add_command(dataset_description_cmd)
-main.add_command(validate_cmd)
+main.set_lazy_command("unzip", "bidscomatic.cli.unzip:cli")
+main.set_lazy_command("init", "bidscomatic.cli.init:cli")
+main.set_lazy_command("convert", "bidscomatic.cli.convert:cli")
+main.set_lazy_command("bids", "bidscomatic.cli.bids:cli")
+main.set_lazy_command("participants", "bidscomatic.cli.participants:cli")
+main.set_lazy_command("questionnaires", "bidscomatic.cli.questionnaires:cli")
+main.set_lazy_command("phenotype-json", "bidscomatic.cli.phenotype_json:cli")
+main.set_lazy_command("events", "bidscomatic.cli.events:cli")
+main.set_lazy_command(
+    "dataset-description", "bidscomatic.cli.dataset_description:cli"
+)
+main.set_lazy_command("validate", "bidscomatic.cli.validate:cli")
+main.set_lazy_command("preprocess", "bidscomatic.cli.preprocess:cli")
+main.set_lazy_command("qc", "bidscomatic.cli.qc:cli")
+main.set_lazy_command("fsl", "bidscomatic.cli.fsl:cli")
 
 # The public symbol exported by this module.  Required for ``python -m`` entry-points.
 cli = main

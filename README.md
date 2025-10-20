@@ -17,7 +17,7 @@ MyBids is a comprehensive toolkit and example repository for working with neuroi
 
 | Category | Description |
 |----------|-------------|
-| **DICOM → BIDS Conversion** | `bidscomatic-cli` automates naming, folder structure, and JSON side‑car creation so scanner output becomes a valid BIDS dataset in one step. |
+| **DICOM → BIDS Conversion** | `bidscomatic-cli` delivers end-to-end DICOM study orchestration — extraction, conversion, curation, preprocessing, QC & validation — so raw scans land in a polished, BIDS-compliant layout. |
 | **DICOM Archive Querying** | `dicomatic-cli` connects to **PACS**/**XNAT** archives, letting you search and download series by patient, study, or accession number. |
 | **CBRAIN Pipeline Launcher** | `cbrain-cli` submits and monitors jobs on the **CBRAIN** HPC platform (e.g. HippUnfold), handles upload/download, and writes outputs back into `derivatives/` following BIDS. |
 | **Unified Command Hub** | A single `bids` umbrella command re‑exports the three tools above, providing `bids bidscomatic …`, `bids dicomatic …`, and `bids cbrain …` for shell‑completion convenience. |
@@ -96,7 +96,7 @@ The **`bids`** umbrella command exposes three sub‑commands, all of which accep
 
 | Command | Purpose |
 |---------|---------|
-| `bids bidscomatic <dicom_src> <bids_dst>` | Convert raw DICOMs to BIDS. |
+| `bids bidscomatic <dicom_src> <bids_dst>` | Run the end-to-end DICOM orchestration toolkit to extract, convert, curate, preprocess, QC and validate a study into BIDS. |
 | `bids dicomatic fetch --patient-id <ID> --series "<pattern>" <outdir>` | Query & download from PACS/XNAT. |
 | `bids cbrain --launch-tool hippunfold …` | Submit CBRAIN jobs and retrieve outputs (e.g. HippUnfold or fMRIPrep). |
 

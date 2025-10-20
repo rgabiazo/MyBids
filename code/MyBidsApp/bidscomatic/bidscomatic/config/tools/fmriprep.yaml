@@ -1,0 +1,14 @@
+image: nipreps/fmriprep:25.1.4
+defaults:
+  data_dir: .
+  out_dir: derivatives/fmriprep
+  work_dir: derivatives/work/fmriprep
+  tf_dir: derivatives/templateflow
+  fs_license: license.txt
+  anat_only: false
+  reconall: false
+  low_mem: false
+  n_procs: 1
+  mem_mb: 16000
+  omp_threads: 1
+  reset_bids_db: false

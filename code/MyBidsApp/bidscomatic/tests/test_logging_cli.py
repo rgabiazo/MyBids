@@ -7,6 +7,7 @@ CLI = ["python", "-m", "bidscomatic.cli", "unzip"]
 
 
 def test_unzip_plain_text_output(tmp_path: Path) -> None:
+    """Verify unzip plain text output behavior."""
     archive = tmp_path / "example.zip"
     with ZipFile(archive, "w") as zf:
         zf.writestr("dummy.dcm", b"0")
@@ -24,6 +25,7 @@ def test_unzip_plain_text_output(tmp_path: Path) -> None:
 
 
 def test_default_json_log_location(tmp_path: Path) -> None:
+    """Verify default JSON LOG location behavior."""
     archive = tmp_path / "example.zip"
     with ZipFile(archive, "w") as zf:
         zf.writestr("dummy.dcm", b"0")
@@ -51,6 +53,7 @@ def test_default_json_log_location(tmp_path: Path) -> None:
 
 
 def test_dataset_root_log_location(tmp_path: Path) -> None:
+    """Verify dataset root LOG location behavior."""
     archive = tmp_path / "example.zip"
     with ZipFile(archive, "w") as zf:
         zf.writestr("dummy.dcm", b"0")

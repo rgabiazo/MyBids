@@ -16,8 +16,10 @@ Key responsibilities:
 
 from __future__ import annotations
 
+import json
 import logging
 import re
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Dict, List, Mapping, Sequence, Tuple
 
@@ -144,6 +146,41 @@ def extract_stim_paths(sheet: Path, img_col: str) -> list[Path]:
 _RUN_RE = re.compile(r"[Rr]un(\d+)")
 
 
+def _col_signature(col_name: str) -> str:
+    """Return a normalised signature for *col_name*.
+
+    The signature is used to choose the most appropriate reaction-time column
+    for a given onset column when multiple candidates share the same run
+    number.  It strips the ``RunXX`` suffix (and everything after it) and keeps
+    only lower-cased alphabetic characters so that tokens such as ``recog`` or
+    ``encode`` can be compared reliably.
+    """
+
+    m = _RUN_RE.search(col_name)
+    prefix = col_name[: m.start()] if m else col_name
+    return re.sub(r"[^a-z]", "", prefix.lower())
+
+
+def _rt_similarity(onset_col: str, rt_col: str) -> float:
+    """Compute how well *rt_col* matches *onset_col* for tie-breaking.
+
+    Scores are biased so that direct prefix matches beat generic string
+    similarity.  This keeps backwards compatibility with datasets that only
+    provide a single RT column per run while correctly handling layouts where
+    both encoding and recognition RT columns share the same run number.
+    """
+
+    onset_sig = _col_signature(onset_col)
+    rt_sig = _col_signature(rt_col)
+    if not onset_sig or not rt_sig:
+        return 0.0
+    if onset_sig == rt_sig:
+        return 3.0
+    if onset_sig in rt_sig or rt_sig in onset_sig:
+        return 2.0
+    return SequenceMatcher(None, onset_sig, rt_sig).ratio()
+
+
 def _detect_run_id(col_name: str) -> int:
     """Extract the run number from *col_name*.
 
@@ -220,12 +257,16 @@ def _guess_trial_type(fname: str, patterns: Mapping[str, str]) -> str:
 def make_events_frames(  # noqa: C901 – data‑munging is inherently busy
     *,
     sheet: Path,
-    img_col: str,
-    accuracy_col: str,
+    img_col: str | None,
+    accuracy_col: str | None,
+    response_cols: Sequence[str] | None = None,
     onset_cols: Sequence[str],
-    rt_cols: Sequence[str],
-    duration: float | int,
-    trialtype_patterns: str,
+    rt_cols: Sequence[str] | None = None,
+    duration: float | int | None,
+    duration_col: str | None = None,
+    duration_map: Mapping[str, float] | None = None,
+    trialtype_patterns: str | None,
+    trialtype_col: str | None = None,
     sub: str,
     ses: str | None,
     task: str,
@@ -239,12 +280,20 @@ def make_events_frames(  # noqa: C901 – data‑munging is inherently busy
 
     Args:
         sheet:              Path to the behavioural sheet.
-        img_col:            Column containing the stimulus file name.
+        img_col:            Optional column containing the stimulus file name.
         accuracy_col:       Column indicating the correctness of the response.
-        onset_cols:         Ordered list of onset‑time columns (one per run).
-        rt_cols:            Ordered list of reaction‑time columns (one per run).
+                            Optional when *response_cols* is provided.
+        response_cols:      Candidate columns to coalesce into ``response`` –
+                            first non-empty value per row wins.
+        onset_cols:         Ordered list of onset-time columns (one per run).
+        rt_cols:            Optional ordered list of reaction-time columns
+                            (one per run).
         duration:           Constant trial duration (seconds).
-        trialtype_patterns: Semi‑colon separated ``substring=label`` pairs.
+        duration_col:       Optional column containing per-row durations.
+        trialtype_patterns: Semi-colon separated ``substring=label`` pairs.
+        trialtype_col:      Optional column containing pre-defined trial type
+                            values.  When provided the values are copied and
+                            optionally mapped through *trialtype_patterns*.
         sub:                Canonical ``sub-XXX`` identifier.
         ses:                Canonical ``ses-YYY`` identifier or *None*.
         task:               BIDS *TaskName* entity.
@@ -252,14 +301,14 @@ def make_events_frames(  # noqa: C901 – data‑munging is inherently busy
                             ``onset`` and ``duration`` columns are always
                             included.
         rename_cols:        Optional mapping ``{old: new}`` applied *before*
-                            lower‑casing via :func:`tidy_columns`.
+                            lower-casing via :func:`tidy_columns`.
         keep_raw_stim:      When ``True`` the ``stim_file`` column retains the
                             original value from *img_col*.  By default only the
                             basename relative to the ``stimuli`` directory is
                             kept.
 
     Returns:
-        Mapping of filename → DataFrame.  A sheet that contains multiple runs
+        Mapping of filename → DataFrame.  A sheet that contains multiple runs
         yields multiple frames.
 
     Raises:
@@ -269,48 +318,113 @@ def make_events_frames(  # noqa: C901 – data‑munging is inherently busy
     df = _read_table(sheet)
 
     # ── column presence checks ------------------------------------------
-    for req in (img_col, accuracy_col, *onset_cols, *rt_cols):
+    # accuracy_col becomes optional when response_cols is used
+    required = [*onset_cols]
+    if img_col:
+        required.append(img_col)
+    for req in required:
         if req not in df.columns:
             raise RuntimeError(f"Column '{req}' missing in {sheet}")
+    if response_cols:
+        if not any(c in df.columns for c in response_cols):
+            raise RuntimeError(
+                f"None of the --response-cols are present in {sheet}: {response_cols}"
+            )
+    elif accuracy_col:
+        if accuracy_col not in df.columns:
+            raise RuntimeError(f"Column '{accuracy_col}' missing in {sheet}")
 
-    # ── pair onset & RT columns -----------------------------------------
-    pairs = [
-        (o, r)
-        for o, r in zip(onset_cols, rt_cols)
-        if o in df.columns and r in df.columns
-    ]
-    if not pairs:
-        raise RuntimeError("No valid onset/RT column pairs – nothing to do.")
+    if trialtype_col and trialtype_col not in df.columns:
+        raise RuntimeError(f"Column '{trialtype_col}' missing in {sheet}")
 
-    tt_map = _parse_patterns(trialtype_patterns)
+    if trialtype_patterns and not (trialtype_col or img_col):
+        raise RuntimeError(
+            "'trialtype_patterns' requires either 'trialtype_col' or 'img_col'"
+        )
+
+    tt_map = _parse_patterns(trialtype_patterns) if trialtype_patterns else None
     events: list[pd.DataFrame] = []
 
-    # Iterate over (onset, RT) column pairs – each represents one run.
-    for onset_col, rt_col in pairs:
+    for onset_col in onset_cols:
         try:
             run_id = _detect_run_id(onset_col)
-        except ValueError as err:
-            log.warning("[events] %s – skipped column '%s'", err, onset_col)
-            continue
+        except ValueError:
+            run_id = 1
+        rt_col = None
+        if rt_cols:
+            candidates: list[tuple[float, int, str]] = []
+            for idx, rc in enumerate(rt_cols):
+                try:
+                    if _detect_run_id(rc) != run_id:
+                        continue
+                except ValueError:
+                    continue
+                score = _rt_similarity(onset_col, rc)
+                candidates.append((score, -idx, rc))
+            if candidates:
+                _, _, rt_col = max(candidates)
 
         rows = df.loc[~df[onset_col].isna()].copy()
         if rows.empty:
-            log.debug("[events] %s – no rows for run %02d", sheet.name, run_id)
+            log.debug("[events] %s – no rows for %s", sheet.name, onset_col)
             continue
 
-        # Construct mandatory BIDS columns.
         rows["onset"] = rows[onset_col].astype(float)
-        rows["duration"] = float(duration)
-        rows["trial_type"] = (
-            rows[img_col].astype(str).apply(lambda f: _guess_trial_type(f, tt_map))
-        )
-        rows["stim_file"] = rows[img_col].astype(str)
-        if not keep_raw_stim:
-            rows["stim_file"] = rows["stim_file"].apply(lambda p: Path(str(p)).name)
-        rows["response_time"] = pd.to_numeric(rows[rt_col], errors="coerce")
-        rows["response"] = rows[accuracy_col]
-        rows["run"] = run_id
+        default_dur: float | None = None
+        if duration_map and onset_col in duration_map:
+            default_dur = float(duration_map[onset_col])
+        elif duration is not None:
+            default_dur = float(duration)
 
+        if duration_col and duration_col in rows.columns:
+            per_row = pd.to_numeric(rows[duration_col], errors="coerce")
+            if default_dur is not None:
+                per_row = per_row.fillna(default_dur)
+            rows["duration"] = per_row.astype(float)
+        else:
+            if default_dur is None:
+                rows["duration"] = pd.Series([pd.NA] * len(rows), dtype="float64")
+            else:
+                rows["duration"] = float(default_dur)
+        if trialtype_col:
+            rows["trial_type"] = rows[trialtype_col].astype(str)
+            if tt_map:
+                rows["trial_type"] = rows["trial_type"].apply(
+                    lambda value: _guess_trial_type(value, tt_map)
+                )
+        elif tt_map:
+            if not img_col:
+                raise RuntimeError(
+                    "trialtype_patterns requires --img-col when --trialtype-col is absent"
+                )
+            rows["trial_type"] = rows[img_col].astype(str).apply(
+                lambda f: _guess_trial_type(f, tt_map)
+            )
+        if img_col:
+            rows["stim_file"] = rows[img_col].astype(str)
+            if not keep_raw_stim:
+                rows["stim_file"] = rows["stim_file"].apply(lambda p: Path(str(p)).name)
+        if rt_col and rt_col in df.columns:
+            rows["response_time"] = pd.to_numeric(rows[rt_col], errors="coerce")
+        else:
+            rows["response_time"] = pd.NA
+
+        # Build 'response': coalesce first non-empty across response_cols (if given),
+        # otherwise mirror the accuracy column for backward compatibility.
+        if response_cols:
+            resp = pd.Series(pd.NA, index=rows.index, dtype="object")
+            for col in response_cols:
+                if col in df.columns:
+                    vals = df.loc[rows.index, col]
+                    # Fill where 'resp' is NA/blank and source 'vals' is non-empty
+                    mask_empty = resp.isna() | (resp.astype(str).str.strip() == "")
+                    src_ok = vals.notna() & (vals.astype(str).str.strip() != "")
+                    resp = resp.mask(mask_empty & src_ok, vals)
+            rows["response"] = resp
+        elif accuracy_col:
+            rows["response"] = rows[accuracy_col]  # type: ignore[index]
+
+        rows["run"] = run_id
         events.append(rows)
 
     if not events:
@@ -344,3 +458,63 @@ def make_events_frames(  # noqa: C901 – data‑munging is inherently busy
         len(full),
     )
     return frames
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 4. Helper – infer dir entity from existing BOLD files
+# ════════════════════════════════════════════════════════════════════════════
+
+# Mapping PhaseEncodingDirection values to BIDS ``dir-`` tags.
+_PED_MAP_TO_DIR_FOR_RAS: Dict[str, str] = {
+    "i": "LR",  # Left→Right
+    "i-": "RL",  # Right→Left
+    "j": "PA",  # Posterior→Anterior
+    "j-": "AP",  # Anterior→Posterior
+    "k": "IS",  # Inferior→Superior
+    "k-": "SI",  # Superior→Inferior
+}
+
+
+def infer_dir_tag(dest_dir: Path, events_fname: str) -> str | None:
+    """Return ``dir-XYZ`` for *events_fname* based on BOLD metadata.
+
+    The helper searches *dest_dir* for a matching ``*_bold.json`` or
+    ``*_bold.nii.gz``. When a side-car JSON is found and contains a valid
+    ``PhaseEncodingDirection`` entry it takes precedence.  Otherwise the
+    function falls back to parsing ``dir-`` from the BOLD filename.  When no
+    information is available, *None* is returned and the caller should omit the
+    ``dir`` entity.
+
+    Parameters
+    ----------
+    dest_dir:
+        Directory containing the BOLD files.
+    events_fname:
+        Filename produced by :func:`make_events_frames` (e.g.
+        ``sub-001_ses-01_task-demo_run-01_events.tsv``).
+    """
+
+    # Construct glob pattern with optional ``dir-`` entity before ``run-``
+    stem = events_fname.replace("_events.tsv", "")
+    pattern = stem.replace("_run-", "*_run-")
+
+    # 1) Look for a JSON sidecar with PhaseEncodingDirection
+    for sidecar in dest_dir.glob(f"{pattern}_bold.json"):
+        try:
+            meta = json.loads(sidecar.read_text() or "{}")
+        except Exception as exc:  # pragma: no cover - log and continue
+            log.debug("[events] could not read %s: %s", sidecar, exc)
+            continue
+        ped = meta.get("PhaseEncodingDirection")
+        if ped:
+            tag = _PED_MAP_TO_DIR_FOR_RAS.get(str(ped))
+            if tag:
+                return f"dir-{tag}"
+
+    # 2) Fallback to BOLD filenames containing ``dir-``
+    for bold in dest_dir.glob(f"{pattern}_bold.nii.gz"):
+        m = re.search(r"_dir-([A-Za-z0-9]+)_", bold.name)
+        if m:
+            return f"dir-{m.group(1)}"
+
+    return None

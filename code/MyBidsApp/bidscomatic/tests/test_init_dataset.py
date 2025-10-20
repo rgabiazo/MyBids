@@ -10,6 +10,7 @@ import sys
 CLI = ["python", "-m", "bidscomatic.cli", "init"]
 
 def test_init_writes_dataset_description(tmp_path: Path):
+    """Verify init writes dataset description behavior."""
     out_dir = tmp_path / "MyStudy"
     # 1) run the CLI in a subprocess to exercise the real entry-point
     result = subprocess.run(
@@ -29,6 +30,7 @@ def test_init_writes_dataset_description(tmp_path: Path):
 
 
 def test_no_rename_on_existing_dir(tmp_path: Path) -> None:
+    """Verify NO rename ON existing DIR behavior."""
     ds = tmp_path / "My_Existing"
     ds.mkdir()
     # Write a placeholder dataset_description.json

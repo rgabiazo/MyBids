@@ -9,6 +9,7 @@ from bidscomatic.pipelines.unzip import unzip_archives
 
 def test_unzip_single_zip(tmp_path: Path):
     # 1) create a throw-away zip with one fake DICOM
+    """Verify unzip single ZIP behavior."""
     archive = tmp_path / "sub-001.zip"
     dcm_name = "IMAGE0001.dcm"
     with ZipFile(archive, "w") as zf:

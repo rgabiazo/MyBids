@@ -18,7 +18,12 @@ import numpy as np
 
 
 def _fake_4d(p: Path, vols: int) -> None:
-    """Write a minimal 4-D NIfTI + empty JSON side-car at *p*."""
+    """Write a synthetic 4-D fMRI time series.
+
+    Args:
+        p: Destination path for the generated NIfTI file.
+        vols: Number of volumes stored in the image.
+    """
     data = np.zeros((2, 2, 2, vols), dtype=np.uint8)
     nib.save(nib.Nifti1Image(data, np.eye(4)), p)
     p.with_suffix("").with_suffix(".json").write_text("{}")
@@ -26,6 +31,7 @@ def _fake_4d(p: Path, vols: int) -> None:
 
 def test_rest_single_run_no_run_entity(tmp_path: Path) -> None:
     # 1 – minimal BIDS scaffold
+    """Verify rest single RUN NO RUN entity behavior."""
     ds = tmp_path / "ds"
     ds.mkdir()
     (ds / "dataset_description.json").write_text("{}")

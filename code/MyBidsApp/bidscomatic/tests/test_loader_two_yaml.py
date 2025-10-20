@@ -7,6 +7,7 @@ from bidscomatic.config.loader import load_config
 
 def test_loader_merges_two_yaml(tmp_path: Path):
     # 1) Create minimal series.yaml (modalities intentionally empty)
+    """Verify loader merges TWO yaml behavior."""
     series = tmp_path / "series.yaml"
     series.write_text("version: '1.0'\nmodalities: {}\n")
 

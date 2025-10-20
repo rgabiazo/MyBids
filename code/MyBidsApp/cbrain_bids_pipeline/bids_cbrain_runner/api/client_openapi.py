@@ -114,6 +114,28 @@ class CbrainTaskError(Exception):
     """Raised when task creation fails or a task cannot be queried."""
 
 
+def _stringify_api_error(data: object) -> str:
+    """Return a human-friendly string from an API error payload.
+
+    CBRAIN may return validation errors as a mapping of field names to lists
+    of issues.  This helper flattens such structures into a readable message
+    like ``"field is invalid"``.  Non-dictionary payloads are converted to
+    ``str`` unchanged.
+    """
+
+    if isinstance(data, dict):
+        parts = []
+        for key, value in data.items():
+            if isinstance(value, (list, tuple)):
+                joined = ", ".join(str(v) for v in value)
+            else:
+                joined = str(value)
+            parts.append(f"{key} {joined}".strip())
+        if parts:
+            return "; ".join(parts)
+    return str(data)
+
+
 def get_api_client(base_url: str, token: str) -> ApiClient:
     """Return a token-authenticated *ApiClient* instance.
 
@@ -475,6 +497,9 @@ class CbrainClient:
             raise CbrainTaskError(f"CBRAIN API returned an error: {err_msg}")
 
         if status_code is not None and status_code >= 400:
-            raise CbrainTaskError(f"CBRAIN API HTTP {status_code}: {data}")
+            err_text = _stringify_api_error(data)
+            raise CbrainTaskError(
+                f"CBRAIN API HTTP {status_code}: {err_text}"
+            )
 
         return data

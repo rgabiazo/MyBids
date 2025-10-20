@@ -28,8 +28,13 @@ from .schema import ConfigSchema
 # --------------------------------------------------------------------------- #
 # Wheel-internal fallbacks (work even from a zipped wheel)                    #
 # --------------------------------------------------------------------------- #
-_DEFAULT_SERIES = files("bidscomatic.resources") / "default_series.yaml"
-_DEFAULT_FILES = files("bidscomatic.resources") / "default_files.yaml"
+try:
+    _DEFAULT_SERIES = files("bidscomatic.resources") / "default_series.yaml"
+    _DEFAULT_FILES = files("bidscomatic.resources") / "default_files.yaml"
+except ModuleNotFoundError:
+    _BASE = Path(__file__).resolve().parent.parent / "resources"
+    _DEFAULT_SERIES = _BASE / "default_series.yaml"
+    _DEFAULT_FILES = _BASE / "default_files.yaml"
 
 # --------------------------------------------------------------------------- #
 # Helper functions                                                            #

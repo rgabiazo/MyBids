@@ -6,6 +6,7 @@ CLI = ["python", "-m", "bidscomatic.cli", "dataset-description"]
 
 
 def test_create_dataset_description(tmp_path: Path) -> None:
+    """Verify create dataset description behavior."""
     ds = tmp_path / "study"
     ds.mkdir()
 
@@ -23,6 +24,7 @@ def test_create_dataset_description(tmp_path: Path) -> None:
 
 
 def test_create_with_extra_fields(tmp_path: Path) -> None:
+    """Verify create with extra fields behavior."""
     ds = tmp_path / "study2"
     ds.mkdir()
 
@@ -53,6 +55,7 @@ def test_create_with_extra_fields(tmp_path: Path) -> None:
 
 
 def test_update_dataset_description(tmp_path: Path) -> None:
+    """Verify update dataset description behavior."""
     ds = tmp_path / "study"
     ds.mkdir()
     (ds / "dataset_description.json").write_text("{}")
@@ -69,6 +72,7 @@ def test_update_dataset_description(tmp_path: Path) -> None:
 
 
 def test_update_extra_fields(tmp_path: Path) -> None:
+    """Verify update extra fields behavior."""
     ds = tmp_path / "study3"
     ds.mkdir()
     (ds / "dataset_description.json").write_text("{}")

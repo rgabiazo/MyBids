@@ -142,6 +142,42 @@ def test_flattened_download_no_wrapper(monkeypatch, tmp_path):
     assert (tmp_path / "CITATION.bib").exists()
 
 
+def test_flattened_download_keepdir_sourcedata(monkeypatch, tmp_path):
+    """Keep-dirs like sourcedata are preserved when flattening."""
+
+    tree = {
+        "/uf/sub-001-3051586": (["logs", "sourcedata", "sub-001"], []),
+        "/uf/sub-001-3051586/sub-001": (["ses-01"], []),
+        "/uf/sub-001-3051586/sub-001/ses-01": (["anat"], []),
+        "/uf/sub-001-3051586/sub-001/ses-01/anat": ([], ["sub-001_desc-preproc_T1w.nii.gz"]),
+        "/uf/sub-001-3051586/logs": (["20251015"], []),
+        "/uf/sub-001-3051586/logs/20251015": ([], ["fmriprep.toml"]),
+        "/uf/sub-001-3051586/sourcedata": (["freesurfer"], []),
+        "/uf/sub-001-3051586/sourcedata/freesurfer": (["sub-001"], []),
+        "/uf/sub-001-3051586/sourcedata/freesurfer/sub-001": (["mri"], []),
+        "/uf/sub-001-3051586/sourcedata/freesurfer/sub-001/mri": ([], ["brain.mgz"]),
+    }
+
+    def fake_listdirs(_, path):
+        return tree.get(path, ([], []))
+
+    monkeypatch.setattr(download_utils, "list_subdirs_and_files", fake_listdirs)
+
+    sftp = DummySFTP()
+    download_utils.flattened_download(
+        sftp=sftp,
+        remote_dir="/uf/sub-001-3051586",
+        local_root=str(tmp_path),
+        tool_name="FMRIprepBidsSubject",
+        keep_dirs=["logs", "sourcedata"],
+        wrapper="FmriPrepOutput",
+    )
+
+    assert (tmp_path / "sub-001" / "ses-01" / "anat" / "sub-001_desc-preproc_T1w.nii.gz").exists()
+    assert (tmp_path / "logs" / "20251015" / "fmriprep.toml").exists()
+    assert (tmp_path / "sourcedata" / "freesurfer" / "sub-001" / "mri" / "brain.mgz").exists()
+
+
 def test_flattened_download_subject_dirs(monkeypatch, tmp_path):
     """Keep-dirs can be relocated under the subject hierarchy."""
 

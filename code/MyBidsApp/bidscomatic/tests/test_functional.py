@@ -8,6 +8,12 @@ import numpy as np
 
 
 def _fake_4d(p: Path, vols: int) -> None:
+    """Write a synthetic 4-D fMRI time series.
+
+    Args:
+        p: Destination path for the generated NIfTI file.
+        vols: Number of volumes stored in the image.
+    """
     data = np.zeros((2, 2, 2, vols), dtype=np.uint8)
     nib.save(nib.Nifti1Image(data, np.eye(4)), p)
     p.with_suffix("").with_suffix(".json").write_text("{}")

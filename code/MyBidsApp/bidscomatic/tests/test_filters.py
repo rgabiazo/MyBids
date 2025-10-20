@@ -11,6 +11,7 @@ from bidscomatic.pipelines.types import SubjectSession
 
 
 def test_filter_paths(tmp_path: Path):
+    """Verify filter paths behavior."""
     roots = [
         tmp_path / "sub-001/ses-01",
         tmp_path / "sub-001/ses-02",
@@ -25,6 +26,7 @@ def test_filter_paths(tmp_path: Path):
 
 
 def test_filter_subject_sessions():
+    """Verify filter subject sessions behavior."""
     ss_all = [
         SubjectSession(root=Path("/tmp"), sub="sub-001", ses="ses-01"),
         SubjectSession(root=Path("/tmp"), sub="sub-001", ses="ses-02"),

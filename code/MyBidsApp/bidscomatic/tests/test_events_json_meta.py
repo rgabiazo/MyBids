@@ -4,6 +4,7 @@ from bidscomatic.utils.events_json import build_metadata
 
 
 def test_build_metadata_levels(tmp_path: Path) -> None:
+    """Verify build metadata levels behavior."""
     df = pd.DataFrame(
         {
             "onset": [0, 1],

@@ -16,7 +16,12 @@ CLI = ["python", "-m", "bidscomatic.cli", "bids"]
 
 
 def _fake_epi(dst: Path, series_idx: int) -> None:
-    """Write a tiny NIfTI (1 or 2 vols) + empty JSON side-car."""
+    """Write a tiny EPI NIfTI and empty JSON sidecar.
+
+    Args:
+        dst: Destination path for the synthetic volume.
+        series_idx: Series number used to toggle volume count.
+    """
     vols = 1 + (series_idx % 2)  # odd → 2 vols, even → 1 vol
     img = nib.Nifti1Image(np.zeros((2, 2, 2, vols), dtype=np.uint8), np.eye(4))
     nib.save(img, dst)
@@ -24,6 +29,7 @@ def _fake_epi(dst: Path, series_idx: int) -> None:
 
 
 def test_series_index_tiebreak(tmp_path: Path):
+    """Verify series index tiebreak behavior."""
     ds = tmp_path / "ds"; ds.mkdir()
     (ds / "dataset_description.json").write_text("{}")
 

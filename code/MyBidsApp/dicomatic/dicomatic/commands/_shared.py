@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import click
 from click import Context
@@ -23,6 +23,47 @@ from dicomatic.utils.input_helpers import prompt_input
 from dicomatic.utils.prompts import prompt_yes_no
 
 log = logging.getLogger(__name__)
+
+
+def _normalise_description(value: Any) -> Optional[str]:
+    """Return a clean ``StudyDescription`` string or ``None`` when missing.
+
+    Click sometimes forwards internal sentinel objects (for example
+    ``Sentinel.UNSET``) when an option with ``envvar`` is defined but no value
+    is supplied.  Emitting those raw objects in user-facing messages is
+    confusing—most notably it produced the warning
+    ``'Sentinel.UNSET' not found`` when the interactive menu was opened.
+
+    Args:
+        value: Raw option value coming from Click, environment variables, or
+            user input.
+
+    Returns:
+        ``None`` when *value* represents “not provided”; otherwise a stripped
+        string suitable for querying the PACS.
+    """
+
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        cleaned = value.strip()
+        return cleaned or None
+
+    cls_name = value.__class__.__name__
+    sentinel_name = getattr(value, "name", "")
+
+    # Click uses ``Sentinel.UNSET`` to signal “no value”.  Treat it the same as
+    # ``None`` so that the interactive helper prompts the user instead of
+    # running a query with the sentinel’s repr.
+    if cls_name == "Sentinel" and sentinel_name.upper() == "UNSET":
+        return None
+
+    text = str(value).strip()
+    if text.upper() == "SENTINEL.UNSET":
+        return None
+
+    return text or None
 
 
 # --------------------------------------------------------------------------- #
@@ -144,9 +185,12 @@ def fetch_studies_interactive(
         :py:meth:`click.Context.exit` when a return to the main menu is
         requested.
     """
-    # Attempt implicit value from CLI flag or environment variable
+    # Normalise values supplied by Click or the environment.  Sentinels and
+    # whitespace-only inputs should behave the same as ``None``.
+    desc = _normalise_description(desc)
+
     if not desc:
-        desc = os.environ.get("DICOMATIC_STUDY_DESCRIPTION")
+        desc = _normalise_description(os.environ.get("DICOMATIC_STUDY_DESCRIPTION"))
 
     # First try without prompting
     if desc:
@@ -158,7 +202,9 @@ def fetch_studies_interactive(
 
     # Loop until a valid description is provided or the operation is aborted
     while True:
-        user_desc = prompt_input("Enter StudyDescription to search for")
+        user_desc = _normalise_description(
+            prompt_input("Enter StudyDescription to search for")
+        )
         if not user_desc:
             continue  # Empty input → re-prompt
 

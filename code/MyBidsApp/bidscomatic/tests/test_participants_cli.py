@@ -5,6 +5,7 @@ import pandas as pd
 CLI = ["python", "-m", "bidscomatic.cli", "participants"]
 
 def test_participants_cli_basic(tmp_path: Path) -> None:
+    """Verify participants CLI basic behavior."""
     ds = tmp_path / "ds"
     ds.mkdir()
     (ds / "dataset_description.json").write_text("{}")

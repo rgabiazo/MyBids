@@ -1,0 +1,3 @@
+# Default thresholds for `bidscomatic-cli qc`
+fd_thresh: 0.5
+fd_power_radius: 50.0

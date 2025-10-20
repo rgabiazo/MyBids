@@ -6,6 +6,14 @@ CLI = ["python", "-m", "bidscomatic.cli", "phenotype-json"]
 
 
 def _setup_dataset(tmp_path: Path) -> Path:
+    """Create a minimal dataset with a single phenotype TSV.
+
+    Args:
+        tmp_path: Temporary directory provided by the pytest fixture.
+
+    Returns:
+        Path to the dataset root prepared for the test.
+    """
     ds = tmp_path / "ds"
     ds.mkdir()
     (ds / "dataset_description.json").write_text("{}")
@@ -17,7 +25,14 @@ def _setup_dataset(tmp_path: Path) -> Path:
 
 
 def _setup_runs_dataset(tmp_path: Path) -> Path:
-    """Return dataset with two TSV files for separate runs."""
+    """Create a dataset containing per-run phenotype TSV files.
+
+    Args:
+        tmp_path: Temporary directory provided by the pytest fixture.
+
+    Returns:
+        Path to the dataset root prepared for the test.
+    """
     ds = tmp_path / "ds"
     ds.mkdir()
     (ds / "dataset_description.json").write_text("{}")
@@ -30,6 +45,7 @@ def _setup_runs_dataset(tmp_path: Path) -> Path:
 
 
 def test_create_phenotype_json(tmp_path: Path) -> None:
+    """Verify create phenotype JSON behavior."""
     ds = _setup_dataset(tmp_path)
     spec = ds / "spec.json"
     spec.write_text(
@@ -50,6 +66,7 @@ def test_create_phenotype_json(tmp_path: Path) -> None:
 
 
 def test_skip_without_overwrite(tmp_path: Path) -> None:
+    """Verify skip without overwrite behavior."""
     ds = _setup_dataset(tmp_path)
     subprocess.run(CLI + ["phenotype/mmq_abl_ses-01.tsv"], cwd=ds, check=True)
     before = (ds / "phenotype/mmq_abl_ses-01.json").read_text()
@@ -61,6 +78,7 @@ def test_skip_without_overwrite(tmp_path: Path) -> None:
 
 
 def test_flag_overrides(tmp_path: Path) -> None:
+    """Verify flag overrides behavior."""
     ds = _setup_dataset(tmp_path)
     subprocess.run(
         CLI
@@ -86,6 +104,7 @@ def test_flag_overrides(tmp_path: Path) -> None:
 
 
 def test_overrides_beat_json_spec(tmp_path: Path) -> None:
+    """Verify overrides beat JSON spec behavior."""
     ds = _setup_dataset(tmp_path)
     spec = ds / "spec.json"
     spec.write_text(
@@ -117,6 +136,7 @@ def test_overrides_beat_json_spec(tmp_path: Path) -> None:
 
 
 def test_json_unicode_not_escaped(tmp_path: Path) -> None:
+    """Verify JSON unicode NOT escaped behavior."""
     ds = _setup_dataset(tmp_path)
     subprocess.run(
         CLI
@@ -134,6 +154,7 @@ def test_json_unicode_not_escaped(tmp_path: Path) -> None:
 
 
 def test_create_json_multiple_runs(tmp_path: Path) -> None:
+    """Verify create JSON multiple runs behavior."""
     ds = _setup_runs_dataset(tmp_path)
     subprocess.run(
         CLI
@@ -149,6 +170,7 @@ def test_create_json_multiple_runs(tmp_path: Path) -> None:
 
 
 def test_overrides_apply_to_all_runs(tmp_path: Path) -> None:
+    """Verify overrides apply TO ALL runs behavior."""
     ds = _setup_runs_dataset(tmp_path)
     subprocess.run(
         CLI

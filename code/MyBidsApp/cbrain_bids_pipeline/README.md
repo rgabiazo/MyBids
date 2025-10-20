@@ -8,13 +8,16 @@
 ## Contents
 
 - [Overview](#overview)
+- [Quick‑start cheatsheet](#quick-start-cheatsheet)
+  - [From zero to first output (5 steps)](#from-zero-to-first-output-5-steps)
 - [Highlights](#highlights)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Configuration](#configuration)
+  - [Where do config files live?](#where-do-config-files-live)
   - [YAML files](#yaml-files)
   - [Environment variables](#environment-variables)
-- [Quick‑start cheatsheet](#quick-start-cheatsheet)
+- [Tool name mapping](#tool-name-mapping)
 - [CLI Usage](#cli-usage)
   - [Listing resources](#listing-resources)
   - [Creating a new CBRAIN project](#creating-a-new-cbrain-project)
@@ -37,6 +40,61 @@
 ## Overview
 
 This CLI and Python helper connect a local, BIDS‑structured dataset to CBRAIN. It validates your BIDS tree, syncs it to data providers via SFTP, registers files, launches BIDS‑aware tools on specific clusters, monitors/retries tasks, and downloads derivatives into your `derivatives/` tree.
+
+---
+
+## Quick‑start cheatsheet
+
+> **Naming style used throughout this README**  
+> Narrative text (paper/tool names): **HippUnfold**, **fMRIPrep**, **DeepPrep**.  
+> CLI & YAML keys: **hippunfold**, **FMRIprepBidsSubject** (CBRAIN tool name for fMRIPrep), **deepprep**.
+
+### From zero to first output (5 steps)
+
+1) **Validate** your BIDS dataset:
+
+```bash
+cbrain-cli --bids-validator sub-* ses-*
+```
+
+2) **Create a project** (CBRAIN calls these *groups*):
+
+```bash
+cbrain-cli --create-group "DemoProject" --group-description "hello-world run"
+```
+
+3) **Upload a tiny subset** (one subject/session) and register it on provider **51**:
+
+```bash
+cbrain-cli --upload-bids-and-sftp-files sub-001 ses-01 anat   --upload-register --upload-dp-id 51 --upload-group-id DemoProject
+```
+
+4) **Launch one task** (pick *one* of the following):
+
+- **HippUnfold (minimal)**
+
+```bash
+cbrain-cli --launch-tool hippunfold   --group-id DemoProject   --tool-param interface_userfile_ids=UFID   --tool-param subject_dir=UFID
+```
+
+- **fMRIPrep (requires a FreeSurfer license)**
+
+```bash
+# Upload your FreeSurfer license.txt first and note its userfile ID (e.g., 7201)
+cbrain-cli --launch-tool FMRIprepBidsSubject   --group-id DemoProject   --tool-param interface_userfile_ids='[7201,UFID]'   --tool-param bids_dir=UFID   --tool-param fs_license_file=7201   --tool-param anat_only=true --tool-param low_mem=true
+```
+
+> Replace **UFID** with the CBRAIN *userfile ID* of your uploaded subject. A practical way to find it is `cbrain-cli --list-userfiles-group DemoProject`.
+
+5) **Check status → download** the first result:
+
+```bash
+# Check until the task shows 'Completed'
+cbrain-cli --task-status DemoProject --task-type hippunfold
+
+# Then download HippUnfold outputs into derivatives/hippunfold
+cbrain-cli download --tool hippunfold   --output-type HippunfoldOutput   --group DemoProject --flatten --skip-dirs config logs work
+```
 
 ---
 
@@ -66,11 +124,19 @@ This CLI and Python helper connect a local, BIDS‑structured dataset to CBRAIN.
 
 ## Installation
 
-Clone the repo:
+**Option A — clone this repo directly**
 
 ```bash
-git clone https://github.com/rgabiazo/MyBids.git
-cd MyBids/code/MyBidsApp/cbrain_bids_pipeline
+git clone https://github.com/your-org/cbrain_bids_pipeline.git
+cd cbrain_bids_pipeline
+```
+
+**Option B — this project lives inside a larger repo**  
+If you vendor this project as a subfolder of a larger repository, `cd` into that subdirectory before installing. For example:
+
+```bash
+git clone https://github.com/example-user/MyBids.git
+cd MyBids/code/MyBidsApp/cbrain_bids_pipeline   # adjust if your layout differs
 ```
 
 Create and activate a virtual environment (optional but recommended):
@@ -100,6 +166,16 @@ pip install -e bids_cbrain_runner/
 ## Configuration
 
 Three YAML files drive runtime behavior.
+
+### Where do config files live?
+
+By default the CLI looks for configuration **in your current project** first and then in your **user config directory**:
+
+1. **Project‑local**: `./cbrain/` (e.g., `./cbrain/servers.yaml`, `./cbrain/tools.yaml`, `./cbrain/defaults.yaml`)
+2. **User‑level**: `~/.config/cbrain_bids_pipeline/`
+
+If a file exists in both places, the **project‑local** version is used. This keeps team settings with the repo while allowing personal overrides at `~/.config`.
+
 
 | File               | Purpose                                                     |
 |--------------------|-------------------------------------------------------------|
@@ -180,41 +256,28 @@ export CBRAIN_TIMEOUT=60  # HTTP request timeout in seconds (default 60)
 For one‑off commands you can also inline credentials:
 
 ```bash
-CBRAIN_USERNAME=alice@example.com CBRAIN_PASSWORD='your_password' \
-  cbrain-cli --bids-validator sub-* ses-*
+CBRAIN_USERNAME=alice@example.com CBRAIN_PASSWORD='your_password'   cbrain-cli --bids-validator sub-* ses-*
 ```
 
 ---
 
-## Quick‑start cheatsheet
+## Tool name mapping
 
-| Task                                                                                  | Command                                                                                        |
-| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| **Validate** dataset                                                                  | `cbrain-cli --bids-validator sub-* ses-*`                                                      |
-| **Compare** local vs. remote                                                          | `cbrain-cli --check-bids-and-sftp-files sub-* ses-* anat`                                      |
-| **Create project**                                                                    | `cbrain-cli --create-group DemoProject --group-description "test dataset"`                     |
-| **Create** local task alias                                                           | `cbrain-cli --alias "6cat=assocmemory"`                                                        |
-| **Enable** verbose logs *(append to any command)*                                     | `cbrain-cli --debug-logs`                                                                      |
-| **Preview upload (dry‑run)**                                                          | `cbrain-cli --upload-bids-and-sftp-files sub-* --upload-dp-id 51 --upload-dry-run`             |
-| **Upload** & register                                                                 | `cbrain-cli --upload-bids-and-sftp-files sub-* --upload-register --upload-dp-id 51`            |
-| **Launch** HippUnfold on project *MyTrial*                                            | `cbrain-cli --launch-tool hippunfold --group-id MyTrial --param modality=T1w`                  |
-| **Launch** fMRIPrep on project *DemoBids*                                             | `cbrain-cli --launch-tool FMRIprepBidsSubject --group-id DemoBids`                             |
-| **Launch** DeepPrep on project *NeuroPilot*                                           | `cbrain-cli --launch-tool deepprep --group-id NeuroPilot --tool-param bold_task_type=rest`     |
-| **Monitor** a task *(numeric IDs: checked as **project ID** first, else **task ID**)* | `cbrain-cli --task-status 456789`                                                              |
-| **List** HippUnfold tasks in a project                                                | `cbrain-cli --task-status MyTrial --task-type hipppunfold`                                     |
-| **Retry** a failed task                                                               | `cbrain-cli --retry-task 456789`                                                               |
-| **Retry** all failed tasks in project                                                 | `cbrain-cli --retry-failed MyTrial`                                                            |
-| **Retry** failed HippUnfold tasks                                                     | `cbrain-cli --retry-failed MyTrial --task-type hippunfold`                                     |
-| **Recover** all failed on cluster HippUnfold tasks in a project                       | `cbrain-cli --error-recover-failed DemoProject --task-type hippunfold`                         |
-| **Download** derivatives                                                              | `cbrain-cli download --tool hippunfold --group MyTrial --flatten --skip-dirs config logs work` |
-| **Delete** a userfile                                                                 | `cbrain-cli --delete-userfile 123 --dry-delete`                                                |
-| **Purge** filetype from project                                                       | `cbrain-cli --delete-group MyTrial --delete-filetype BidsSubject`                              |
+| CLI / YAML key          | CBRAIN portal display name | Notes                            |
+|-------------------------|----------------------------|----------------------------------|
+| `hippunfold`            | HippUnfold                 |                                  |
+| `FMRIprepBidsSubject`   | fMRIPrep                   | CBRAIN tool wrapper name         |
+| `deepprep`              | DeepPrep                   |                                  |
+
+> CBRAIN’s wrapper tool name for **fMRIPrep** is **FMRIprepBidsSubject**. Use that exact key with `--launch-tool` and in `tools.yaml`.
 
 ---
 
 ## CLI Usage
 
 ### Listing resources
+
+Use these commands to inspect CBRAIN's available tools, their configurations, existing projects, and execution servers before launching jobs.
 
 ```console
 $ cbrain-cli --list-tools
@@ -272,9 +335,10 @@ Found 1 userfile(s) in group Trial on provider 4.
 
 ### Creating a new CBRAIN project
 
+Initialize a CBRAIN project (group) to organize uploaded datasets and launched tasks.
+
 ```bash
-cbrain-cli --create-group "MyTrial" \
-  --group-description "test dataset"
+cbrain-cli --create-group "MyTrial"   --group-description "test dataset"
 ```
 
 On success:
@@ -300,8 +364,7 @@ Created group ID=42 name=DemoProject
 CBRAIN userfiles can belong to multiple projects. When uploading to a second project, provide the destination via `--upload-group-id` (ID or name):
 
 ```bash
-cbrain-cli --upload-bids-and-sftp-files sub-* --upload-register \
-  --upload-dp-id 51 --upload-group-id 456
+cbrain-cli --upload-bids-and-sftp-files sub-* --upload-register   --upload-dp-id 51 --upload-group-id 456
 ```
 
 > **Note** Re‑uploading a file with the same name to the **same** Data Provider is skipped; each provider keeps a single copy per filename.
@@ -321,22 +384,15 @@ Optionally relocate the file when combined with `--move-to-provider`.
 Use `--upload-bids-and-sftp-files` with one or more file globs:
 
 ```bash
-cbrain-cli --upload-bids-and-sftp-files dataset_description.json \
-  --upload-register --upload-dp-id 51 --upload-group-id NewProject
+cbrain-cli --upload-bids-and-sftp-files dataset_description.json   --upload-register --upload-dp-id 51 --upload-group-id NewProject
 ```
 
 ```bash
-cbrain-cli --upload-bids-and-sftp-files sub-* ses-01 anat \
-  --upload-register --upload-dp-id 51 \
-  --upload-filetypes BidsSubject \
-  --upload-group-id NewProject
+cbrain-cli --upload-bids-and-sftp-files sub-* ses-01 anat   --upload-register --upload-dp-id 51   --upload-filetypes BidsSubject   --upload-group-id NewProject
 ```
 
 ```console
-$ cbrain-cli --upload-bids-and-sftp-files sub-* ses-01 anat \
-  --upload-register --upload-dp-id 51 \
-  --upload-filetypes BidsSubject \
-  --upload-group-id DemoProject
+$ cbrain-cli --upload-bids-and-sftp-files sub-* ses-01 anat   --upload-register --upload-dp-id 51   --upload-filetypes BidsSubject   --upload-group-id DemoProject
 INFO: token retrieved for user@example.com
 INFO: Uploaded 6 file(s) to provider 51
 INFO: Registered 6 userfile(s) in project DemoProject
@@ -347,124 +403,62 @@ Missing folders are skipped entirely. Single files inside `derivatives/` are upl
 **Dry run** without transferring files:
 
 ```bash
-cbrain-cli --upload-bids-and-sftp-files sub-* ses-01 anat \
-  --upload-dp-id 51 --upload-dry-run
+cbrain-cli --upload-bids-and-sftp-files sub-* ses-01 anat   --upload-dp-id 51 --upload-dry-run
 ```
 
 Example uploading the same file to two different providers:
 
 ```console
-$ cbrain-cli \
-  --upload-bids-and-sftp-files participants.tsv \
-  --upload-register \
-  --upload-dp-id 51 \
-  --upload-group-id DemoBids
+$ cbrain-cli   --upload-bids-and-sftp-files participants.tsv   --upload-register   --upload-dp-id 51   --upload-group-id DemoBids
 ...
-$ cbrain-cli \
-  --upload-bids-and-sftp-files participants.tsv \
-  --upload-register \
-  --upload-dp-id 32 \
-  --upload-group-id DemoBids
+$ cbrain-cli   --upload-bids-and-sftp-files participants.tsv   --upload-register   --upload-dp-id 32   --upload-group-id DemoBids
 ...
 ```
 
 ---
 
-#### Upload derivative files
+## Launching tasks
 
-Ignore `derivatives/` during validation:
+Create tasks directly with `--launch-tool`. The examples below show **batch** and **single‑userfile** launches for **HippUnfold**, **fMRIPrep**, and **DeepPrep**, using multi‑line CLI blocks consistent with the rest of this README.
 
-```bash
-echo "derivatives/" >> .bidsignore
-```
+> **Conventions used below**
+>
+> - **Batch** = `--launch-tool-batch-group` + `--launch-tool-batch-type` → one task per matching userfile.  
+> - **Single** = `--group-id` + `--tool-param interface_userfile_ids=...` (and, if required, `subject_dir` or `bids_dir`).  
+> - **FreeSurfer license** = set `--tool-param fs_license_file=<UFID>` and include the same ID in `interface_userfile_ids` so tools can mount it.
 
-Upload specific derivative files:
+### HippUnfold — batch
 
-```bash
-cbrain-cli --upload-bids-and-sftp-files derivatives license.txt \
-  --upload-register --upload-dp-id 51 \
-  --upload-filetypes TextFile \
-  --upload-group-id DemoProject
-```
-
-Reshape remote layout:
-
-```bash
-cbrain-cli --upload-bids-and-sftp-files derivatives DeepPrep BOLD sub-01 \
-  --upload-remote-root fmriprep/BOLD \
-  --upload-path-map anat=ses-01/anat
-```
-
-Wildcards for subsets (e.g., topup‑corrected BOLD):
-
-```bash
-cbrain-cli --upload-bids-and-sftp-files derivatives fsl topup 'sub-*' ses-01 func '*_desc-topupcorrected_bold.nii.gz' \
-  --upload-register --upload-dp-id 51 \
-  --upload-filetypes NiftiFile \
-  --upload-group-id DemoProject
-```
-
-Upload an entire derivatives folder:
-
-```bash
-cbrain-cli --upload-bids-and-sftp-files derivatives fsl level-1 preprocessing_preICA sub-* ses-01 func \
-  --upload-register --upload-dp-id 51 \
-  --upload-filetypes File \
-  --upload-group-id DemoProject
-```
-
----
-
-### Launching tasks
-
-Create tasks directly with `--launch-tool`. The examples show **batch** and **single‑userfile** launches for **HippUnfold**, **fMRIPrep**, and **DeepPrep**.
-
-#### HippUnfold — batch
-
-```bash
-cbrain-cli --launch-tool hippunfold \
+```console
+(.venv) user@host DemoProject % cbrain-cli --launch-tool hippunfold \
   --tool-param modality=T1w \
   --launch-tool-batch-group DemoProject \
   --launch-tool-batch-type BidsSubject \
   --launch-tool-bourreau-id 104 \
   --launch-tool-results-dp-id 51
+INFO: token retrieved for user@example.com
+INFO: Task created for 'hippunfold' on cluster 'rorqual':
+{ "id": 123456, "type": "BoutiquesTask::Hippunfold", ... }
 ```
+
+### HippUnfold — single userfile
 
 ```console
-INFO: token retrieved for user@example.com
-Task created for 'hippunfold' on cluster 'rorqual':
-{
-  "id": 123456,
-  "type": "BoutiquesTask::Hippunfold",
-  ...
-}
-```
-
-#### HippUnfold — single userfile
-
-```bash
-cbrain-cli --launch-tool hippunfold \
+(.venv) user@host DemoProject % cbrain-cli --launch-tool hippunfold \
   --group-id DemoProject \
   --tool-param interface_userfile_ids=9001 \
   --tool-param subject_dir=9001 \
   --launch-tool-bourreau-id 104 \
   --launch-tool-results-dp-id 51
+INFO: token retrieved for user@example.com
+INFO: Task created for 'hippunfold' on cluster 'rorqual':
+{ "id": 123457, "type": "BoutiquesTask::Hippunfold", ... }
 ```
+
+### fMRIPrep — batch
 
 ```console
-INFO: token retrieved for user@example.com
-Task created for 'hippunfold' on cluster 'rorqual':
-{
-  "id": 123457,
-  "type": "BoutiquesTask::Hippunfold",
-  ...
-}
-```
-
-#### fMRIPrep — batch
-
-```bash
-cbrain-cli --launch-tool FMRIprepBidsSubject \
+(.venv) user@host BrainProject % cbrain-cli --launch-tool FMRIprepBidsSubject \
   --tool-param interface_userfile_ids='[7201]' \
   --tool-param fs_license_file=7201 \
   --tool-param output_spaces='["MNI152NLin6Asym","MNI152NLin2009cAsym:res-2"]' \
@@ -475,107 +469,294 @@ cbrain-cli --launch-tool FMRIprepBidsSubject \
   --launch-tool-batch-type BidsSubject \
   --launch-tool-bourreau-id 110 \
   --launch-tool-results-dp-id 51
+INFO: token retrieved for user@example.com
+INFO: Task created for 'FMRIprepBidsSubject' on cluster 'fir':
+{ "id": 234567, "type": "BoutiquesTask::FMRIprepBidsSubject", ... }
 ```
 
+### fMRIPrep — single subject on **Rorqual**
+
 ```console
-INFO: token retrieved for user@example.com
-Task created for 'FMRIprepBidsSubject' on cluster 'fir':
+(.venv) user@host SampleBidsProject % cbrain-cli --launch-tool FMRIprepBidsSubject \
+    --group-id SampleBidsProject \
+    --tool-param bids_dir=6067624 \
+    --tool-param interface_userfile_ids='[6085435,6067624]' \
+    --tool-param fs_license_file=6085435 \
+    --tool-param output_spaces='["T1w","MNI152NLin2009cAsym:res-2"]' \
+    --tool-param use_aroma=true \
+    --tool-param output_layout=bids \
+    --launch-tool-bourreau-id 104 \
+    --launch-tool-results-dp-id 51 \
+    --tool-param output_dir_name="{full_noex}-{task_id}" \
+    --tool-param low_mem=true \
+    --tool-param cbrain_enable_output_cache_cleaner=false
+INFO: Retrieved new CBRAIN token for user 'demo_user'
+INFO: Task created for 'FMRIprepBidsSubject' on cluster 'rorqual':
+{ "id": 234567, "type": "BoutiquesTask::FMRIprepBidsSubject", ... }
+```
+
+### fMRIPrep — **Recon-all** for single subject on **Rorqual**
+
+```console
+(.venv) user@host ExampleBidsProject % cbrain-cli --launch-tool FMRIprepBidsSubject \
+    --group-id SampleBidsTest \
+    --tool-param bids_dir=6067750 \
+    --tool-param interface_userfile_ids='[6067675,6067750]' \
+    --tool-param fs_license_file=6067675 \
+    --tool-param output_spaces='["fsnative","fsaverage6"]' \
+    --tool-param anat_only=true \
+    --tool-param longitudinal=true \
+    --tool-param output_layout=bids \
+    --launch-tool-bourreau-id 104 \
+    --launch-tool-results-dp-id 51 \
+    --tool-param output_dir_name="{full_noex}-{task_id}" \
+    --tool-param cbrain_enable_output_cache_cleaner=false
+INFO: Retrieved new CBRAIN token for user 'demo_user'
+INFO: Task created for 'FMRIprepBidsSubject' on cluster 'rorqual':
 {
-  "id": 234567,
+  "id": 3051583,
   "type": "BoutiquesTask::FMRIprepBidsSubject",
-  ...
+  "user_id": 9999,
+  "group_id": 12346,
+  "bourreau_id": 104,
+  "tool_config_id": 8909,
+  "batch_id": 3051583,
+  "params": {
+    "invoke": {
+      "output_dir_name": "{full_noex}-{task_id}",
+      "low_mem": "0",
+      "anat_only": true,
+      "boilerplate": "0",
+      "longitudinal": true,
+      "bold2t1w_dof": 6,
+      "use_bbr": "0",
+      "output_layout": "bids",
+      "medial_surface_nan": "0",
+      "use_aroma": "0",
+      "return_all_components": "0",
+      "aroma_melodic_dimensionality": -200,
+      "skull_strip_template": "OASIS30ANTs",
+      "skull_strip_fixed_seed": "0",
+      "fmap_bspline": "0",
+      "fmap_no_demean": "0",
+      "use_syn_sdc": "0",
+      "force_syn": "0",
+      "no_submm_recon": "0",
+      "no_reconall": "0",
+      "resource_monitor": "0",
+      "reports_only": "0",
+      "write_graph": "0",
+      "stop_on_first_crash": "0",
+      "notrack": "0",
+      "sloppy": "0",
+      "bids_dir": 6067750,
+      "fs_license_file": 6067675,
+      "output_spaces": [
+        "fsnative",
+        "fsaverage6"
+      ]
+    },
+    "cbrain_enable_output_cache_cleaner": false,
+    "interface_userfile_ids": [
+      "6067675",
+      "6067750"
+    ]
+  },
+  "status": "New",
+  "created_at": "2025-10-16T01:43:15.000-04:00",
+  "updated_at": "2025-10-16T01:43:15.000-04:00",
+  "run_number": null,
+  "results_data_provider_id": 51,
+  "cluster_workdir_size": null,
+  "workdir_archived": false,
+  "workdir_archive_userfile_id": null,
+  "description": null
 }
 ```
 
-#### fMRIPrep — single userfile
+### DeepPrep — **anatomical only**, single subject 
 
-```bash
-cbrain-cli --launch-tool FMRIprepBidsSubject \
-  --group-id BrainProject \
-  --tool-param interface_userfile_ids='[7201,8201]' \
-  --tool-param bids_dir=8201 \
-  --tool-param fs_license_file=7201 \
-  --tool-param output_dir_name=sub-001-run1 \
-  --tool-param output_spaces='["MNI152NLin6Asym","MNI152NLin2009cAsym:res-2"]' \
-  --tool-param anat_only=true \
-  --tool-param low_mem=true \
-  --tool-param no_reconall=true \
-  --launch-tool-batch-type BidsSubject \
-  --launch-tool-bourreau-id 110 \
-  --launch-tool-results-dp-id 51
-```
+> **Task labels.** DeepPrep expects BOLD runs with a task label (e.g., `task1`, `rest`, `motor`, etc.). If you want to run anatomical processing, provide task label a placeholder and set anat_only=true.
 
 ```console
-INFO: token retrieved for user@example.com
-Task created for 'FMRIprepBidsSubject' on cluster 'fir':
+(.venv) user@host DemoProject % cbrain-cli --launch-tool deepprep   --launch-tool-group-id SampleBidsProject   --launch-tool-bourreau-id 110   --launch-tool-results-dp-id 51   --tool-param bids_dir=6067624   --tool-param interface_userfile_ids='[6085435,6067624]'   --tool-param fs_license_file=6085435   --tool-param bold_task_type="assocmemory"   --tool-param anat_only=true   --custom-output 'output_dir_name="{bids_dir}-{cortthickness}"'   --tool-param cbrain_enable_output_cache_cleaner=false
+INFO: Retrieved new CBRAIN token for user 'demo_user'
+INFO: [INFO] Custom output output_dir_name resolved to sub-002-cortthickness
+INFO: Task created for 'deepprep' on cluster 'fir':
 {
-  "id": 234568,
-  "type": "BoutiquesTask::FMRIprepBidsSubject",
-  ...
-}
-```
-
-#### DeepPrep — batch
-
-DeepPrep expects BOLD runs whose task label is one of `6cat`, `rest`, `motor`, or `rest motor`. If your files use a different label, create symlinks and update the JSON `TaskName` so filenames contain one of these values. You can use the `cbrain-cli --alias` command to automate this.
-
-```bash
-cbrain-cli --launch-tool deepprep \
-  --launch-tool-batch-group PilotStudy \
-  --launch-tool-batch-type BidsSubject \
-  --launch-tool-bourreau-id 110 \
-  --launch-tool-results-dp-id 51 \
-  --tool-param interface_userfile_ids='[8123]' \
-  --tool-param fs_license_file=8123 \
-  --tool-param bold_task_type=rest \
-  --tool-param output_dir_name="{full_noex}-{task_id}" \
-  --tool-param cbrain_enable_output_cache_cleaner=false
-```
-
-```console
-INFO: token retrieved for user@example.com
-Task created for 'deepprep' on cluster 'fir':
-{
-  "id": 345678,
+  "id": 3061480,
   "type": "BoutiquesTask::DeepPrep",
-  ...
+  "user_id": 9999,
+  "group_id": 12345,
+  "bourreau_id": 110,
+  "tool_config_id": 10697,
+  "batch_id": 3061480,
+  "params": {
+    "invoke": {
+      "anat_only": true,
+      "bold_only": "0",
+      "bold_sdc": true,
+      "bold_confounds": true,
+      "bold_skip_frames": 0,
+      "bold_cifti": "0",
+      "bold_surface_spaces": "fsaverage6",
+      "bold_volume_space": "MNI152NLin6Asym",
+      "bold_volume_res": "02",
+      "ignore_error": false,
+      "bids_dir": 6067624,
+      "fs_license_file": 6085435,
+      "bold_task_type": "assocmemory",
+      "output_dir_name": "sub-002-cortthickness"
+    },
+    "cbrain_enable_output_cache_cleaner": "false",
+    "interface_userfile_ids": [
+      "6085435",
+      "6067624"
+    ]
+  },
+  "status": "New",
+  "created_at": "2025-10-17T07:39:22.000-04:00",
+  "updated_at": "2025-10-17T07:39:22.000-04:00",
+  "run_number": null,
+  "results_data_provider_id": 51,
+  "cluster_workdir_size": null,
+  "workdir_archived": false,
+  "workdir_archive_userfile_id": null,
+  "description": null
 }
 ```
 
-#### DeepPrep — single userfile
-
-```bash
-cbrain-cli --launch-tool deepprep \
-  --group-id PilotStudy \
-  --tool-param interface_userfile_ids='[8123,8124]' \
-  --tool-param bids_dir=8124 \
-  --tool-param fs_license_file=8123 \
-  --tool-param bold_task_type=rest \
-  --launch-tool-bourreau-id 110 \
-  --launch-tool-results-dp-id 51 \
-  --tool-param output_dir_name="{full_noex}-{task_id}" \
-  --tool-param cbrain_enable_output_cache_cleaner=false
-```
+### DeepPrep — fMRI preprocessing **batch** 
 
 ```console
-INFO: token retrieved for user@example.com
-Task created for 'deepprep' on cluster 'fir':
+(.venv) user@host DemoProject % cbrain-cli --launch-tool deepprep     --launch-tool-batch-group SampleBidsProject     --launch-tool-batch-type BidsSubject     --launch-tool-bourreau-id 110     --launch-tool-results-dp-id 51     --tool-param interface_userfile_ids='[6085435]'     --tool-param fs_license_file=6085435     --tool-param bold_task_type="assocmemory"     --custom-output 'output_dir_name="{bids_dir}-{bold_task_type}"'     --tool-param cbrain_enable_output_cache_cleaner=false
+INFO: Retrieved new CBRAIN token for user 'demo_user'
+INFO: [BATCH 6067624] Launching 'deepprep' (dry_run=False)…
+INFO: [INFO] Custom output output_dir_name resolved to sub-002-assocmemory
+INFO: Task created for 'deepprep' on cluster 'fir':
 {
-  "id": 345679,
+  "id": 3061486,
   "type": "BoutiquesTask::DeepPrep",
-  ...
+  "user_id": 9999,
+  "group_id": 12345,
+  "bourreau_id": 110,
+  "tool_config_id": 10697,
+  "batch_id": 3061486,
+  "params": {
+    "invoke": {
+      "anat_only": "0",
+      "bold_only": "0",
+      "bold_sdc": true,
+      "bold_confounds": true,
+      "bold_skip_frames": 0,
+      "bold_cifti": "0",
+      "bold_surface_spaces": "fsaverage6",
+      "bold_volume_space": "MNI152NLin6Asym",
+      "bold_volume_res": "02",
+      "ignore_error": false,
+      "fs_license_file": 6085435,
+      "bold_task_type": "assocmemory",
+      "bids_dir": 6067624,
+      "output_dir_name": "sub-002-assocmemory"
+    },
+    "cbrain_enable_output_cache_cleaner": "false",
+    "interface_userfile_ids": [
+      "6067624",
+      "6085435"
+    ]
+  },
+  "status": "New",
+  "created_at": "2025-10-17T09:16:48.000-04:00",
+  "updated_at": "2025-10-17T09:16:48.000-04:00",
+  "run_number": null,
+  "results_data_provider_id": 51,
+  "cluster_workdir_size": null,
+  "workdir_archived": false,
+  "workdir_archive_userfile_id": null,
+  "description": null
 }
 ```
 
-> **Note:** DeepPrep tasks may fail on some clusters due to out‑of‑memory errors. Use `cbrain-cli --error-recover <task_id>` to retry **without** re‑uploading inputs, or `cbrain-cli --error-recover-failed MyProj --task-type DeepPrep` to re‑run failed DeepPrep tasks for a project, again without re‑uploading inputs.
+> **Notes**
+>
+> - DeepPrep tasks may fail on some clusters due to out‑of‑memory errors. Use `cbrain-cli --error-recover <task_id>` to retry **without** re‑uploading inputs, or `cbrain-cli --error-recover-failed MyProj --task-type deepprep` to re‑run failed DeepPrep tasks for a project, again without re‑uploading inputs.
+> - **Single vs. batch recap**: For a **single** userfile, pass `--group-id PROJECT` along with `--tool-param interface_userfile_ids=UFID` and (if required) `--tool-param subject_dir=UFID`. For **batch**, specify `--launch-tool-batch-group PROJECT` to create one task per matching userfile.
+> - **FreeSurfer license**: The value for `--tool-param fs_license_file` must be the CBRAIN **userfile ID** of your uploaded `license.txt`. Include that same ID in `interface_userfile_ids`.
 
-**Single vs. batch**: For a **single** userfile, pass `--group-id PROJECT` along with `--tool-param interface_userfile_ids=UFID` and (if required) `--tool-param subject_dir=UFID`. For **batch**, specify `--launch-tool-batch-group PROJECT` to create one task per matching userfile.
+---
 
-**FreeSurfer license**: The value for `--tool-param fs_license_file` must be the CBRAIN **userfile ID** of your uploaded `license.txt`. Include that same ID in `interface_userfile_ids` so the tools can mount it.
+### Custom output naming
+
+Use `--custom-output` to build descriptive derivative directories without
+manually typing task IDs.  Templates follow Python's ``str.format`` syntax and
+can reference any parameter passed via `--tool-param`.  Unknown placeholders are
+kept as literal text, making it easy to mix dynamic values with fixed suffixes.
+
+```console
+$ cbrain-cli --launch-tool deepprep   --launch-tool-group-id SampleBidsProject   --launch-tool-bourreau-id 110   --launch-tool-results-dp-id 51   --tool-param bids_dir=123457   --tool-param interface_userfile_ids='[89101115,123457]'   --tool-param fs_license_file=8910111   --tool-param bold_task_type="assocmemory"   --tool-param anat_only=true   --custom-output 'output_dir_name="{bids_dir}-{cortthickness}"'   --tool-param cbrain_enable_output_cache_cleaner=false
+INFO: Retrieved new CBRAIN token for user 'demo_user'
+INFO: [INFO] Custom output output_dir_name resolved to sub-002-cortthickness
+INFO: Task created for 'deepprep' on cluster 'fir':
+{
+  "id": 3333333,
+  "type": "BoutiquesTask::DeepPrep",
+  "user_id": 9999,
+  "group_id": 11111,
+  "bourreau_id": 110,
+  "tool_config_id": 10697,
+  "batch_id": 7777777,
+  "params": {
+    "invoke": {
+      "anat_only": true,
+      "bold_only": "0",
+      "bold_sdc": true,
+      "bold_confounds": true,
+      "bold_skip_frames": 0,
+      "bold_cifti": "0",
+      "bold_surface_spaces": "fsaverage6",
+      "bold_volume_space": "MNI152NLin6Asym",
+      "bold_volume_res": "02",
+      "ignore_error": false,
+      "bids_dir": 123457,
+      "fs_license_file": 8910111,
+      "bold_task_type": "assocmemory",
+      "output_dir_name": "sub-002-cortthickness"
+    },
+    "cbrain_enable_output_cache_cleaner": "false",
+    "interface_userfile_ids": [
+      "8910111",
+      "123457"
+    ]
+  },
+  "status": "New",
+  "created_at": "2025-10-17T07:39:22.000-04:00",
+  "updated_at": "2025-10-17T07:39:22.000-04:00",
+  "run_number": null,
+  "results_data_provider_id": 51,
+  "cluster_workdir_size": null,
+  "workdir_archived": false,
+  "workdir_archive_userfile_id": null,
+  "description": null
+}
+```
+
+In the example above, the CLI resolves the CBRAIN userfile ID in `bids_dir` to the
+subject name and expands the template to `sub-002-cortthickness`. 
+
+**Tips**
+
+* `{tool_name}` is always available inside templates.
+* CBRAIN-specific placeholders for some tools (e.g., FmriPrep) such as `{full_noex}` still work via
+  `--tool-param` when you prefer server-side expansion.
+* Batch launches apply the template to every subject automatically, so
+  `--custom-output 'output_dir_name="{bids_dir}-{cortthickness}"'` produces one
+  directory per participant.
 
 ---
 
 ### Monitoring & retrying
+
+Track task status and automatically rerun jobs that fail or were interrupted.
 
 ```bash
 # Retry one task by ID
@@ -585,10 +766,10 @@ cbrain-cli --retry-task 123456
 cbrain-cli --retry-failed DemoProject
 
 # Retry only failed HippUnfold tasks
-cbrain-cli --retry-failed DemoProject --task-type hipp
+cbrain-cli --retry-failed DemoProject --task-type hippunfold
 ```
 
-`--task-type` accepts a case‑insensitive prefix (e.g., `hipp` matches `BoutiquesTask::Hippunfold`) or a numeric `tool_config_id`.
+`--task-type` accepts a case‑insensitive prefix (e.g., `hippun` matches `BoutiquesTask::Hippunfold`) or a numeric `tool_config_id`.
 
 ---
 
@@ -611,11 +792,10 @@ cbrain-cli --error-recover-failed DemoProject --task-type hippunfold
 
 ### Downloading
 
-Retrieve derivatives (CLI supports `cbrain-cli download` and `bids-cbrain-cli download`):
+Retrieve derivatives with `cbrain-cli download`:
 
 ```bash
-bids-cbrain-cli download --tool hippunfold \
-  --output-type HippunfoldOutput --group 42
+cbrain-cli download --tool hippunfold   --output-type HippunfoldOutput --group 42
 ```
 
 ```console
@@ -633,13 +813,13 @@ You can also fetch a **single** CBRAIN file via `--id <USERFILE>` (omit `--group
 - `--download-path-map REMOTE=LOCAL` – place a remote directory under a different relative path (repeatable);
 - `--normalize session|subject` – ensure filenames include session/subject labels.
 
-Example (store fMRIPrep results under `derivatives/DeepPrep/BOLD`):
+**Example (store fMRIPrep results under `derivatives/fmriprep`)**
 
 ```bash
-bids-cbrain-cli download --tool FMRIprepBidsSubject \
-  --output-type FmriPrepOutput --group DemoProject \
-  --output-dir DeepPrep/BOLD --flatten --skip-dirs logs
+cbrain-cli download --tool FMRIprepBidsSubject   --output-type FmriPrepOutput --group DemoProject   --output-dir fmriprep --flatten --skip-dirs logs
 ```
+
+> If you intentionally want a different layout (e.g., to merge results into a multi‑tool tree), use `--output-dir` and `--download-path-map` to remap directories.
 
 Example flattened tree:
 
@@ -675,9 +855,7 @@ Combine aliasing with other operations:
 cbrain-cli --alias "assocmemory=6cat" --upload-bids-and-sftp-files sub-005
 
 # or alias after downloading derivatives
-cbrain-cli download --tool deepprep \
-  --alias derivatives DeepPrep BOLD sub-* ses-* func "6cat=assocmemory" \
-  --group DemoProject
+cbrain-cli download --tool deepprep   --alias derivatives DeepPrep BOLD sub-* ses-* func "6cat=assocmemory"   --group DemoProject
 ```
 
 > The optional `sub-*` / `ses-*` placeholders are ignored when determining the base directory, so the command automatically descends into the `sub-*/ses-*` hierarchy.
@@ -685,6 +863,8 @@ cbrain-cli download --tool deepprep \
 ---
 
 ### Deleting
+
+Remove uploaded files or entire projects from CBRAIN. Use `--dry-delete` to preview actions before they run.
 
 Preview with `--dry-delete`:
 
@@ -706,6 +886,8 @@ These helpers rely on CBRAIN OpenAPI endpoints for consistent error handling and
 ---
 
 ## Python API
+
+Integrate the pipeline into your own Python scripts by calling its helper functions directly.
 
 ```python
 from bids_cbrain_runner.commands.tool_launcher import launch_tool

@@ -49,6 +49,38 @@ def test_cli_launch_tool_group_name(monkeypatch):
 
     assert launch_calls and launch_calls[0]["group_id"] == 42
     assert launch_calls[0]["show_spinner"] is True
+    assert launch_calls[0]["custom_output_templates"] == {}
+
+
+def test_cli_launch_tool_custom_output(monkeypatch):
+    cli_mod = _setup_common(monkeypatch)
+
+    monkeypatch.setattr(
+        cli_mod,
+        "resolve_group_id",
+        lambda base_url, token, ident, per_page=100, timeout=None: 51,
+    )
+
+    launch_calls = []
+    monkeypatch.setattr(cli_mod, "launch_tool", lambda **kw: launch_calls.append(kw))
+
+    argv = [
+        "prog",
+        "--launch-tool",
+        "hippunfold",
+        "--group-id",
+        "MyProj",
+        "--custom-output",
+        'output_dir_name="{bids_dir}-hippunfold"',
+    ]
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit):
+        cli_mod.main()
+
+    assert launch_calls
+    assert launch_calls[0]["custom_output_templates"] == {
+        "output_dir_name": "{bids_dir}-hippunfold"
+    }
 
 
 def test_cli_download_group_name(monkeypatch, tmp_path):

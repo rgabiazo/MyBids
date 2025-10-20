@@ -24,6 +24,8 @@ load_config : Callable
 The implementation is intentionally minimal and side-effect free.
 """
 
+import importlib.util
+from pathlib import Path
 from importlib.metadata import PackageNotFoundError, version
 
 # --------------------------------------------------------------------------- #
@@ -47,3 +49,18 @@ except PackageNotFoundError:
 from .config import load_config  # noqa: E402 – deliberate late import
 
 __all__: list[str] = ["load_config", "__version__"]
+
+# Ensure ``bidscomatic.tests`` can be imported from an editable checkout by
+# appending the in-tree tests directory to the package search path.
+_tests_dir = Path(__file__).resolve().parent.parent / "tests"
+if _tests_dir.is_dir():
+    __path__ = list(__path__)  # type: ignore[name-defined]
+    if str(_tests_dir) not in __path__:
+        __path__.append(str(_tests_dir))
+    spec = importlib.util.spec_from_file_location("bidscomatic.tests", _tests_dir / "__init__.py")
+    if spec and spec.loader:
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        import sys
+
+        sys.modules.setdefault("bidscomatic.tests", module)

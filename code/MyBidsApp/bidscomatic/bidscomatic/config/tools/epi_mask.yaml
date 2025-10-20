@@ -1,0 +1,7 @@
+image: nipreps/fmriprep:25.1.4
+defaults:
+  prep_dir: derivatives/fmriprep
+  low_mem: false
+  n_procs: 1
+  mem_mb: 4000
+  omp_threads: 1

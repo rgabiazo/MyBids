@@ -36,9 +36,18 @@ from .slug   import build_cleanup_regex, clean_slug
 from .questionnaires import load_questionnaire_csv, make_tsv_frames
 
 # ─── events utils (NEW) ──────────────────────────────────────────────────
-from .events import make_events_frames           # ★ NEW ★
+from .events import make_events_frames, infer_dir_tag           # ★ NEW ★
 from .validator import find_bids_root_upwards, run_bids_validator
 from .display import echo_banner, echo_subject_session, echo_success, echo_section
+from .motion import (
+    fd_power_from_par,
+    fd_from_confounds,
+    stream_dvars,
+    stream_tsnr,
+    load_mask,
+    RunMetrics,
+)
+from .paths import dataset_root_or_raise, qc_root_for_file, qc_run_dir
 
 # ------------------------------------------------------------------------
 __all__: list[str] = [
@@ -66,10 +75,20 @@ __all__: list[str] = [
     "make_tsv_frames",
     # events
     "make_events_frames",                    # ★ NEW ★
+    "infer_dir_tag",                         # ★ NEW ★
     "find_bids_root_upwards",
     "run_bids_validator",
     "echo_banner",
     "echo_subject_session",
     "echo_success",
     "echo_section",
+    "dataset_root_or_raise",
+    "qc_root_for_file",
+    "qc_run_dir",
+    "fd_power_from_par",
+    "fd_from_confounds",
+    "stream_dvars",
+    "stream_tsnr",
+    "load_mask",
+    "RunMetrics",
 ]

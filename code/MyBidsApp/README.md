@@ -7,7 +7,7 @@
 
 | Sub‑package 📁              | Console script    | What it does                                                                                         | Typical use‑case                                                                  |
 | --------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| **`bidscomatic/`**          | `bidscomatic-cli` | *DICOM ➜ BIDS* conversion, folder re‑organisation, side‑car JSON cleaning                            | You just got a pile of `.dcm` series from the scanner and want a valid BIDS tree. |
+| **`bidscomatic/`**          | `bidscomatic-cli` | A CLI toolkit for end-to-end DICOM study orchestration — extraction, conversion, curation, preprocessing, QC & validation into a BIDS layout                            | You just got a pile of `.dcm` series from the scanner and want a valid, fully curated BIDS dataset. |
 | **`dicomatic/`**            | `dicomatic-cli`   | Query, download and manifest helpers for PACS / XNAT style DICOM archives                            | You need to pull raw DICOMs (or metadata) straight from the source.               |
 | **`cbrain_bids_pipeline/`** | `cbrain-cli` | Launch & monitor **CBRAIN** tools *on* your BIDS dataset (currently `hippunfold`; more tools coming) | You want to run heavy‑duty pipelines on HPC while keeping output BIDS‑compliant.  |
 | **`bids_cli_hub/`**         | `bids`            | Tiny wrapper that re‑exports the three commands above as sub‑commands for muscle‑memory convenience  | You like `git …`, `conda …` style umbrellas and one autocompletion entry.         |
@@ -64,7 +64,7 @@ Each sub‑package ships its own detailed README with examples and advanced usag
 
 | Tool            | One‑liner                              | Highlights                                                             |
 | --------------- | -------------------------------------- | ---------------------------------------------------------------------- |
-| **bidscomatic** | Opinionated *DICOM ➜ BIDS* organiser   | Parallel unpacking, naming heuristics, automatic side‑car fixes        |
+| **bidscomatic** | A CLI for end-to-end DICOM ➜ BIDS orchestration | Extraction, conversion, curation, preprocessing, QC & validation in one toolkit |
 | **dicomatic**   | Lightweight DICOM query & download CLI | Works against PACS & XNAT, CSV manifests, retry logic                  |
 | **bids‑cbrain** | Fire‑and‑forget CBRAIN launcher        | Token auto‑renewal, SFTP uploads/downloads, flatten derivative folders |
 

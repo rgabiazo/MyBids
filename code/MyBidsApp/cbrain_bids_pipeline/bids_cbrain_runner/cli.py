@@ -33,7 +33,7 @@ from bids_cbrain_runner import __version__
 from bids_cbrain_runner.commands.download import download_tool_outputs
 from bids_cbrain_runner.utils.logging_config import setup_logging
 
-from .api.client_openapi import CbrainClient
+from .api.client_openapi import CbrainClient, CbrainTaskError
 from .api.config_loaders import (
     get_sftp_provider_config,
     get_sftp_provider_config_by_id,
@@ -573,6 +573,16 @@ def main() -> None:
         type=parse_kv_pair,
         metavar="KEY=VALUE",
         help="Override a tool parameter (Python literal syntax).",
+    )
+    tool_launch_grp.add_argument(
+        "--custom-output",
+        action="append",
+        type=parse_kv_pair,
+        metavar="KEY=TEMPLATE",
+        help=(
+            "Resolve output parameters from templates. Unknown placeholders "
+            "are treated as literal text."
+        ),
     )
     tool_launch_grp.add_argument(
         "--override-tool-config-id",
@@ -1303,6 +1313,7 @@ def main() -> None:
     # Tool launch (single or batch)
     if args.launch_tool:
         extra_params: Dict[str, Any] = dict(args.tool_param or [])
+        custom_outputs: Dict[str, str] = dict(args.custom_output or [])
 
         if args.launch_tool_batch_group:
             batch_gid = resolve_group_id(
@@ -1321,21 +1332,30 @@ def main() -> None:
             userfile_ids = None
             if args.launch_tool_userfile_ids:
                 userfile_ids = [int(x) for x in args.launch_tool_userfile_ids.split(",")]
-            launch_tool_batch_for_group(
-                base_url=base_url,
-                token=token,
-                tools_cfg=tools_cfg,
-                tool_name=args.launch_tool,
-                group_id=batch_gid,
-                batch_type=args.launch_tool_batch_type,
-                userfile_ids=userfile_ids,
-                extra_params=extra_params,
-                results_dp_id=args.launch_tool_results_dp_id,
-                bourreau_id=args.launch_tool_bourreau_id,
-                override_tool_config_id=args.override_tool_config_id,
-                dry_run=args.launch_tool_dry_run,
-                show_spinner=not args.debug_logs,
-            )
+            try:
+                launch_tool_batch_for_group(
+                    base_url=base_url,
+                    token=token,
+                    tools_cfg=tools_cfg,
+                    tool_name=args.launch_tool,
+                    group_id=batch_gid,
+                    batch_type=args.launch_tool_batch_type,
+                    userfile_ids=userfile_ids,
+                    extra_params=extra_params,
+                    results_dp_id=args.launch_tool_results_dp_id,
+                    bourreau_id=args.launch_tool_bourreau_id,
+                    override_tool_config_id=args.override_tool_config_id,
+                    custom_output_templates=custom_outputs,
+                    dry_run=args.launch_tool_dry_run,
+                    show_spinner=not args.debug_logs,
+                )
+            except CbrainTaskError as exc:
+                logger.error(
+                    "Could not launch tool '%s' in batch: %s",
+                    args.launch_tool,
+                    exc,
+                )
+                sys.exit(1)
         else:
             single_gid = resolve_group_id(
                 base_url,
@@ -1347,19 +1367,28 @@ def main() -> None:
             if single_gid is None:
                 print(f"Group '{args.launch_tool_group_id}' not found")
                 sys.exit(1)
-            launch_tool(
-                base_url=base_url,
-                token=token,
-                tools_cfg=tools_cfg,
-                tool_name=args.launch_tool,
-                extra_params=extra_params,
-                group_id=single_gid,
-                results_dp_id=args.launch_tool_results_dp_id,
-                bourreau_id=args.launch_tool_bourreau_id,
-                override_tool_config_id=args.override_tool_config_id,
-                dry_run=args.launch_tool_dry_run,
-                show_spinner=not args.debug_logs,
-            )
+            try:
+                launch_tool(
+                    base_url=base_url,
+                    token=token,
+                    tools_cfg=tools_cfg,
+                    tool_name=args.launch_tool,
+                    extra_params=extra_params,
+                    group_id=single_gid,
+                    results_dp_id=args.launch_tool_results_dp_id,
+                    bourreau_id=args.launch_tool_bourreau_id,
+                    override_tool_config_id=args.override_tool_config_id,
+                    custom_output_templates=custom_outputs,
+                    dry_run=args.launch_tool_dry_run,
+                    show_spinner=not args.debug_logs,
+                )
+            except CbrainTaskError as exc:
+                logger.error(
+                    "Could not launch tool '%s': %s",
+                    args.launch_tool,
+                    exc,
+                )
+                sys.exit(1)
 
         sys.exit(0)
 

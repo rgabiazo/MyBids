@@ -51,6 +51,7 @@ from ..api.client_openapi import CbrainClient, CbrainTaskError
 from ..commands.userfiles import list_userfiles_by_group
 from ..utils.task_builder import build_task_payload
 from ..utils.progress import run_with_spinner
+from ..utils.custom_output import CustomOutputRenderer
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +68,12 @@ def launch_tool(
     results_dp_id: Optional[int] = None,
     bourreau_id: Optional[int] = None,
     override_tool_config_id: Optional[int] = None,
+    custom_output_templates: Optional[Dict[str, str]] = None,
     dry_run: bool = False,
     *,
     show_spinner: bool = True,
+    client: Optional[CbrainClient] = None,
+    output_renderer: Optional[CustomOutputRenderer] = None,
 ) -> None:
     """Launch a **single** CBRAIN task for *tool_name*.
 
@@ -85,6 +89,10 @@ def launch_tool(
         bourreau_id: Numeric ID of the execution server / HPC *Bourreau*.
         override_tool_config_id: Force a specific ``tool_config_id`` (bypasses
             cluster lookup in *tools.yaml*).
+        custom_output_templates: Optional mapping of parameter names to
+            templates (``str.format`` style) that should be resolved before the
+            payload is submitted.  Unknown placeholders are treated as literal
+            text.
         dry_run: If **True**, print the JSON payload and exit without hitting
             the CBRAIN API.
         show_spinner: Display a console spinner for network operations.
@@ -145,11 +153,11 @@ def launch_tool(
     # ---------------------------------------------------------------------#
     # 4. Fetch Boutiques descriptor to discover required inputs             #
     # ---------------------------------------------------------------------#
-    client = CbrainClient(base_url, token)
+    client_obj = client or CbrainClient(base_url, token)
 
     def _fetch_descriptor() -> dict:
         """Retrieve Boutiques descriptor for ``tool_config_id`` via API."""
-        return client.fetch_boutiques_descriptor(tool_config_id)
+        return client_obj.fetch_boutiques_descriptor(tool_config_id)
 
     try:
         descriptor = run_with_spinner(
@@ -188,6 +196,15 @@ def launch_tool(
 
     # Overlay command-line overrides *after* descriptor defaults.
     combined_params = {**defaults, **(extra_params or {})}
+
+    if custom_output_templates:
+        renderer = output_renderer or CustomOutputRenderer(client_obj)
+        rendered = renderer.render(
+            custom_output_templates,
+            combined_params,
+            tool_name=tool_name,
+        )
+        combined_params.update(rendered)
 
     # ---------------------------------------------------------------------#
     # 6. Extract user-file IDs and separate non-Boutiques params            #
@@ -247,7 +264,7 @@ def launch_tool(
     # ---------------------------------------------------------------------#
     def _create() -> dict:
         """Send the prepared task payload to CBRAIN and return the response."""
-        return client.create_task(payload)
+        return client_obj.create_task(payload)
 
     response = run_with_spinner(
         _create,
@@ -285,9 +302,11 @@ def launch_tool_batch_for_group(
     results_dp_id: Optional[int] = None,
     bourreau_id: Optional[int] = None,
     override_tool_config_id: Optional[int] = None,
+    custom_output_templates: Optional[Dict[str, str]] = None,
     dry_run: bool = False,
     *,
     show_spinner: bool = True,
+    client: Optional[CbrainClient] = None,
 ) -> None:
     """Launch *one task per user-file* inside a CBRAIN group.
 
@@ -306,6 +325,8 @@ def launch_tool_batch_for_group(
         results_dp_id: Destination Data Provider for outputs.
         bourreau_id: Execution server to run on.
         override_tool_config_id: Force a particular ``tool_config_id``.
+        custom_output_templates: Optional mapping of output parameters to
+            templates (``str.format`` style) applied per user-file launch.
         dry_run: Print the payloads but skip submission.
         show_spinner: Display a console spinner during network calls.
 
@@ -321,11 +342,11 @@ def launch_tool_batch_for_group(
     # ------------------------------------------------------------------#
     # 1. Collect user-files matching the filter                         #
     # ------------------------------------------------------------------#
-    client = CbrainClient(base_url, token)
+    client_obj = client or CbrainClient(base_url, token)
 
     def _fetch_userfiles() -> List[Dict[str, Any]]:
         """Retrieve all user-files from ``group_id`` via the CBRAIN API."""
-        return list_userfiles_by_group(client, group_id, per_page=500)
+        return list_userfiles_by_group(client_obj, group_id, per_page=500)
 
     userfiles = run_with_spinner(
         _fetch_userfiles,
@@ -343,6 +364,8 @@ def launch_tool_batch_for_group(
         raise CbrainTaskError(
             f"No user-files of {filt} found in group={group_id}."
         )
+
+    renderer = CustomOutputRenderer(client_obj) if custom_output_templates else None
 
     # ------------------------------------------------------------------#
     # 2. Launch (or simulate) one task per user-file                    #
@@ -385,6 +408,9 @@ def launch_tool_batch_for_group(
             results_dp_id=results_dp_id,
             bourreau_id=bourreau_id,
             override_tool_config_id=override_tool_config_id,
+            custom_output_templates=custom_output_templates,
             dry_run=dry_run,
             show_spinner=show_spinner,
+            client=client_obj,
+            output_renderer=renderer,
         )

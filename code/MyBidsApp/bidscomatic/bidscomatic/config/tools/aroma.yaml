@@ -1,0 +1,15 @@
+image: nipreps/fmripost-aroma:0.0.12
+defaults:
+  prep_dir: derivatives/fmriprep
+  out_dir: derivatives/fmripost_aroma
+  work_dir: derivatives/work/fmripost_aroma
+  tf_dir: derivatives/templateflow
+  melodic_dim: -200
+  denoising_method: nonaggr
+  low_mem: false
+  n_procs: 1
+  mem_mb: 16000
+  omp_threads: 1
+  clean_workdir: false
+  stop_on_first_crash: false
+  reset_bids_db: false

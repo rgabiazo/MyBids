@@ -1,0 +1,57 @@
+# Skeleton configuration for `bidscomatic-cli events`
+# Copy this file and fill in task-specific values. All sections are optional
+# and can also be overridden via command line flags.
+
+version: 1
+command: events
+
+task:
+
+input:
+  root:
+  pattern:
+  subjects: []
+  sessions: []
+
+ingest:
+  img_col:
+  accuracy_col:
+  trialtype_col:
+  duration_col:
+  durations:
+    instruction:
+    trial:
+  onset_groups:
+    - onset_cols: []
+      duration:
+    - onset_cols: []
+      duration:
+  rt_cols: []
+  trialtype_patterns: {}
+
+derive:
+  flags: []
+  set: []
+  regex_map: []
+  regex_extract: []
+  id_from: []
+  synth_rows: []
+  drop: []
+  map_values: []
+  joins:
+    membership: {}
+    value: {}
+    exists_to_flag: {}
+  indices: []
+  set_after_indices: []
+  recode: []
+  optional: {}
+
+output:
+  keep_cols_if_exist: []
+  create_stimuli_directory: false
+  create_events_json: false
+  sidecar:
+    field_descriptions: {}
+    field_units: {}
+    field_levels: {}

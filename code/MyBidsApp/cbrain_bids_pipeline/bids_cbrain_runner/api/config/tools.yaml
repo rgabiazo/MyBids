@@ -57,6 +57,7 @@ tools:
       - config
       - logs
       - work
+      - sourcedata
 
   deepprep:
     version: "24.1.2"

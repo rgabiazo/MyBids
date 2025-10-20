@@ -1,0 +1,6 @@
+image: fsl/fsl:6.0.7.5
+defaults:
+  pattern: "*_desc-nonaggrDenoised_bold.nii.gz"
+  ref: middle
+  width: 747
+  height: 167
