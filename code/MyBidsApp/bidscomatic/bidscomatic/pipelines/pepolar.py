@@ -54,7 +54,6 @@ def _format_path(path: Path, base: Path | None = None) -> str:
         POSIX-style string representation of *path*, prefixed with ``…/`` when
         rendered relative to *base*.
     """
-
     as_posix = path.as_posix()
     if base is not None:
         try:
@@ -74,7 +73,6 @@ def _box_lines(title: str) -> tuple[str, str]:
     Returns:
         Tuple containing the top and bottom border strings.
     """
-
     filler = max(_BOX_WIDTH - len(title), 0)
     top = f"┌─ {title} " + ("─" * filler)
     bottom = "└" + ("─" * (len(top) - 1))
@@ -91,7 +89,6 @@ def _indent_block(text: str, prefix: str = "   ") -> str:
     Returns:
         Indented text block with trailing whitespace stripped.
     """
-
     if not text:
         return ""
     cleaned = text.replace("\r\n", "\n").replace("\r", "\n").rstrip()
@@ -109,7 +106,6 @@ def _extract_final_matrix(stdout: str) -> tuple[list[list[float]], str]:
         rows parsed from the final "Final result" block when present, and
         ``cleaned_stdout`` is the remaining stdout with that block removed.
     """
-
     if not stdout:
         return [], ""
     normalised = stdout.replace("\r\n", "\n").replace("\r", "\n")
@@ -141,14 +137,12 @@ def _extract_final_matrix(stdout: str) -> tuple[list[list[float]], str]:
 
 def _format_heading(title: str) -> str:
     """Return a heading string padded with box drawing characters."""
-
     filler = max(_BOX_WIDTH - len(title), 0)
     return f"── {title} " + ("─" * filler)
 
 
 def _format_matrix(matrix: list[list[float]]) -> list[str]:
     """Return formatted string rows for a 4×4 matrix."""
-
     formatted: list[str] = []
     for row in matrix:
         formatted_row = "  ".join(f"{value: .6f}".lstrip() for value in row)
@@ -166,7 +160,6 @@ def _deriv_dir(root: Path, ss: SubjectSession) -> Path:
     Returns:
         Path pointing to ``derivatives/fsl/McFLIRT/<sub>/<ses?>``.
     """
-
     d = root / "derivatives" / "fsl" / "McFLIRT" / ss.sub
     if ss.ses:
         d = d / ss.ses
@@ -175,7 +168,6 @@ def _deriv_dir(root: Path, ss: SubjectSession) -> Path:
 
 def _prefix(ss: SubjectSession, direction: str) -> str:
     """Return the filename stem prefix for a subject/session/direction."""
-
     parts = [ss.sub]
     if ss.ses:
         parts.append(ss.ses)
@@ -204,7 +196,6 @@ def _derive_fieldmap(
     Returns:
         List of :class:`McflirtRunSummary` entries describing captured matrices.
     """
-
     droot.mkdir(parents=True, exist_ok=True)
     prefix = _prefix(ss, direction)
 
@@ -314,7 +305,6 @@ def _derive_fieldmap(
 
 def _canonical_fmaps(fmap_dir: Path) -> tuple[bool, bool]:
     """Return booleans indicating whether AP and PA canonical files exist."""
-
     ap = any(fmap_dir.glob("*_dir-AP_epi.nii.gz"))
     pa = any(fmap_dir.glob("*_dir-PA_epi.nii.gz"))
     return ap, pa
@@ -337,7 +327,6 @@ def derive_pepolar_fieldmaps(
     Returns:
         List of paths to the generated fieldmap NIfTI files.
     """
-
     written: list[Path] = []
     task_filters = list(tasks) if tasks is not None else []
     task_set = {t.lower() for t in task_filters} if task_filters else None

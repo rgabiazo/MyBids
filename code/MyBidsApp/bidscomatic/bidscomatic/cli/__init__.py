@@ -39,7 +39,6 @@ class LazyGroup(click.Group):
 
     def set_lazy_command(self, name: str, target: str) -> None:
         """Register *name* to be imported from ``target`` on first use."""
-
         self._lazy[name] = target
 
     def get_command(self, ctx, cmd_name):  # noqa: D401 - Click signature

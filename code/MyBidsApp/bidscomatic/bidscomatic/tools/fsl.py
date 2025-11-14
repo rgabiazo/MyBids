@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Generic wrapper for FSL container execution."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Mapping, Sequence

@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Tool wrapper for FSL MCFLIRT."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path

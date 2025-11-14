@@ -147,15 +147,20 @@ _RUN_RE = re.compile(r"[Rr]un(\d+)")
 
 
 def _col_signature(col_name: str) -> str:
-    """Return a normalised signature for *col_name*.
+    """Return a normalised signature for a column name.
+
+    Args:
+        col_name: Raw column name containing optional run tokens.
+
+    Returns:
+        Lower-case characters preceding the run token, suitable for comparison.
 
     The signature is used to choose the most appropriate reaction-time column
     for a given onset column when multiple candidates share the same run
-    number.  It strips the ``RunXX`` suffix (and everything after it) and keeps
+    number. It strips the ``RunXX`` suffix (and everything after it) and keeps
     only lower-cased alphabetic characters so that tokens such as ``recog`` or
     ``encode`` can be compared reliably.
     """
-
     m = _RUN_RE.search(col_name)
     prefix = col_name[: m.start()] if m else col_name
     return re.sub(r"[^a-z]", "", prefix.lower())
@@ -164,12 +169,18 @@ def _col_signature(col_name: str) -> str:
 def _rt_similarity(onset_col: str, rt_col: str) -> float:
     """Compute how well *rt_col* matches *onset_col* for tie-breaking.
 
+    Args:
+        onset_col: Candidate onset column name.
+        rt_col: Candidate reaction-time column name.
+
+    Returns:
+        Score where larger values indicate a better match.
+
     Scores are biased so that direct prefix matches beat generic string
-    similarity.  This keeps backwards compatibility with datasets that only
+    similarity. This keeps backwards compatibility with datasets that only
     provide a single RT column per run while correctly handling layouts where
     both encoding and recognition RT columns share the same run number.
     """
-
     onset_sig = _col_signature(onset_col)
     rt_sig = _col_signature(rt_col)
     if not onset_sig or not rt_sig:
@@ -476,24 +487,22 @@ _PED_MAP_TO_DIR_FOR_RAS: Dict[str, str] = {
 
 
 def infer_dir_tag(dest_dir: Path, events_fname: str) -> str | None:
-    """Return ``dir-XYZ`` for *events_fname* based on BOLD metadata.
+    """Return a ``dir-`` entity for *events_fname* based on BOLD metadata.
+
+    Args:
+        dest_dir: Directory containing BOLD JSON sidecars and NIfTI files.
+        events_fname: Filename produced by :func:`make_events_frames`.
+
+    Returns:
+        ``dir-XYZ`` string when inferable, otherwise ``None``.
 
     The helper searches *dest_dir* for a matching ``*_bold.json`` or
     ``*_bold.nii.gz``. When a side-car JSON is found and contains a valid
-    ``PhaseEncodingDirection`` entry it takes precedence.  Otherwise the
-    function falls back to parsing ``dir-`` from the BOLD filename.  When no
-    information is available, *None* is returned and the caller should omit the
-    ``dir`` entity.
-
-    Parameters
-    ----------
-    dest_dir:
-        Directory containing the BOLD files.
-    events_fname:
-        Filename produced by :func:`make_events_frames` (e.g.
-        ``sub-001_ses-01_task-demo_run-01_events.tsv``).
+    ``PhaseEncodingDirection`` entry it takes precedence. Otherwise the
+    function falls back to parsing ``dir-`` from the BOLD filename. When no
+    information is available, ``None`` is returned and the caller should omit
+    the ``dir`` entity.
     """
-
     # Construct glob pattern with optional ``dir-`` entity before ``run-``
     stem = events_fname.replace("_events.tsv", "")
     pattern = stem.replace("_run-", "*_run-")

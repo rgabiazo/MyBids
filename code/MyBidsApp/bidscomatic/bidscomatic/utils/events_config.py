@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """YAML-driven configuration loader for the :mod:`bidscomatic.cli.events` command.
 
 The loader converts a nested YAML document into a dictionary containing the
@@ -37,6 +35,8 @@ The structure mirrors the example in the project README::
 The caller receives a dictionary with flattened keys that map directly onto the
 arguments consumed by :func:`bidscomatic.cli.events.cli`.
 """
+
+from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
@@ -89,7 +89,6 @@ def _collect_ops(derive: Dict[str, Any]) -> List[Tuple[str, Dict[str, Any]]]:
     - flags: final booleans (analysis_include, is_error…)
     - drop: pruning rows if requested
     """
-
     ops: List[Tuple[str, Dict[str, Any]]] = []
 
     # Keep a local copy of flags; append them at the very end.

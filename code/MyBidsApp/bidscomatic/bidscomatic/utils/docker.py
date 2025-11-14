@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Docker helpers."""
+
+from __future__ import annotations
 
 import platform
 import subprocess
@@ -26,7 +26,6 @@ def detect_platform(image: str) -> str | None:
     architecture. Any probing errors are treated as if the image lacked an
     ``arm64`` manifest.
     """
-
     host = platform.machine()
     try:  # pragma: no cover - best-effort helper
         out = subprocess.check_output(

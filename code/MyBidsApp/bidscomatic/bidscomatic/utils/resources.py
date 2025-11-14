@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Automatic resource tuning for containerised tools."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 import os
@@ -33,7 +33,6 @@ class ResourceSpec:
 
 def _docker_cmd(platform: str | None, *inner: str) -> Optional[str]:
     """Run a tiny BusyBox command inside Docker and return stdout."""
-
     cmd = ["docker", "run", "--rm"]
     if platform:
         cmd += ["--platform", platform]
@@ -126,15 +125,25 @@ def tune_resources(
     omp_threads_default: int = 1,
     omp_threads_override: int | None = None,
 ) -> ResourceSpec:
-    """Return a :class:`ResourceSpec` for ``image``.
+    """Return resource recommendations for the given image.
 
-    When *auto* is ``True`` host resources are probed to derive
-    ``n_procs``, ``mem_mb`` and ``low_mem`` heuristically.  The
-    ``*_override`` parameters force a specific value regardless of the
-    auto-tuning logic.  When *auto* is ``False`` the defaults are used
-    instead, again honouring any overrides.
+    Args:
+        image: Container image name passed to the tool launcher.
+        runner: Execution backend (``"docker"`` or ``"native"``).
+        auto: Whether host resources should be probed automatically.
+        n_procs_default: Worker count used when auto tuning is disabled.
+        mem_mb_default: Memory budget used when auto tuning is disabled.
+        low_mem_default: Default low-memory flag when auto tuning is disabled.
+        per_proc_mb: Desired memory per worker when set.
+        n_procs_override: Explicit worker count, bypassing heuristics.
+        mem_mb_override: Explicit memory allocation, bypassing heuristics.
+        low_mem_override: Explicit low-memory flag, bypassing heuristics.
+        omp_threads_default: Default OpenMP thread count.
+        omp_threads_override: Explicit OpenMP thread count.
+
+    Returns:
+        ResourceSpec describing container CPU, memory, and OpenMP settings.
     """
-
     platform_str = detect_platform(image) if runner == "docker" else None
 
     if not auto:
@@ -262,16 +271,14 @@ def format_resource_summary(
 ) -> str:
     """Return a human-readable summary of tuned resources.
 
-    Parameters
-    ----------
-    spec
-        Resource specification returned by :func:`tune_resources`.
-    subjects
-        Iterable of subject identifiers.
-    image
-        Container image being executed.
-    """
+    Args:
+        spec: Resource specification returned by :func:`tune_resources`.
+        subjects: Iterable of subject identifiers included in the run.
+        image: Container image being executed.
 
+    Returns:
+        String summarising CPU, memory and mode decisions.
+    """
     cpu_cap = (spec.cpu_docker - 2) if spec.cpu_docker and spec.cpu_docker > 2 else 1
     per_proc = 3500 if spec.low_mem else 6500
     mem_safe = spec.mem_mb - 1024 if spec.mem_mb > 1024 else spec.mem_mb

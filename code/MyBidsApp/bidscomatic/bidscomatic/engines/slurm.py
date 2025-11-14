@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Skeleton Slurm execution engine."""
+
+from __future__ import annotations
 
 import subprocess
 from typing import Mapping, Sequence

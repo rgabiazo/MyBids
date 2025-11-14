@@ -45,7 +45,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from ..api.client_openapi import CbrainClient, CbrainTaskError
 from ..commands.userfiles import list_userfiles_by_group
@@ -54,6 +54,24 @@ from ..utils.progress import run_with_spinner
 from ..utils.custom_output import CustomOutputRenderer
 
 logger = logging.getLogger(__name__)
+
+# -----------------------------------------------------------------------------#
+# Internal helpers                                                             #
+# -----------------------------------------------------------------------------#
+
+
+def _normalize_input_value(descriptor: Dict[str, Any], value: Any) -> Any:
+    """Coerce a command-line value to the shape expected by Boutiques."""
+
+    if descriptor.get("type") == "String":
+        if descriptor.get("list"):
+            if isinstance(value, str):
+                return [value]
+        else:
+            if isinstance(value, (list, tuple)):
+                return " ".join(str(item) for item in value)
+    return value
+
 
 # -----------------------------------------------------------------------------#
 # Public API                                                                   #
@@ -175,12 +193,14 @@ def launch_tool(
     # ---------------------------------------------------------------------#
     defaults: Dict[str, Any] = {}
     input_ids = set()
+    input_index: Dict[str, Dict[str, Any]] = {}
     for inp in inputs:
         inp_id = inp.get("id")
         if not inp_id:
             # Skip anonymous inputs (should not happen in valid descriptors).
             continue
         input_ids.add(inp_id)
+        input_index[inp_id] = inp
 
         # Flags → default to string '0' (Boutiques convention for false).
         if inp.get("type") == "Flag":
@@ -196,6 +216,15 @@ def launch_tool(
 
     # Overlay command-line overrides *after* descriptor defaults.
     combined_params = {**defaults, **(extra_params or {})}
+
+    # Normalise parameter values according to descriptor expectations.  This
+    # keeps user-friendly list syntax (e.g. '--tool-param foo="[1,2]"') while
+    # submitting the scalar format that Boutiques expects when ``list`` is not
+    # enabled for the input.
+    for key, value in list(combined_params.items()):
+        if key not in input_index:
+            continue
+        combined_params[key] = _normalize_input_value(input_index[key], value)
 
     if custom_output_templates:
         renderer = output_renderer or CustomOutputRenderer(client_obj)
@@ -279,7 +308,8 @@ def launch_tool(
     for task in tasks:
         desc = task.get("description", "")
         if isinstance(desc, str):
-            task["description"] = desc.splitlines()[-1]
+            lines = desc.splitlines()
+            task["description"] = lines[-1] if lines else ""
 
     logger.info(
         "Task created for '%s' on cluster '%s':\n%s",

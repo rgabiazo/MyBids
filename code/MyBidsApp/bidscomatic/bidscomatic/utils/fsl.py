@@ -1,3 +1,5 @@
+"""Thin wrappers around FSL command-line tools used by bidscomatic."""
+
 from __future__ import annotations
 
 import os

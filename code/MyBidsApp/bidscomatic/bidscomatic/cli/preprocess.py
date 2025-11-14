@@ -95,7 +95,6 @@ def pepolar(
     dry_run: bool,
 ) -> None:
     """Derive opposite phase-encoding fieldmaps (PEPOLAR)."""
-
     root: Path = ctx_obj["root"]
     subs = filter_sub or sorted(
         p.name.removeprefix("sub-") for p in root.glob("sub-*")
@@ -209,7 +208,6 @@ def aroma_cmd(
     runner,
 ):
     """Run fMRIPost-AROMA on preprocessed BOLD files."""
-
     root: Path = ctx_obj["root"]
 
     if create_filter and bids_filter_file:
@@ -364,7 +362,6 @@ def fmriprep_cmd(
     runner,
 ):
     """Run fMRIPrep on raw BIDS data."""
-
     root: Path = ctx_obj["root"]
     overrides = {
         "data_dir": data_dir,
@@ -472,7 +469,6 @@ def epi_mask_cmd(
     runner,
 ):
     """Create brain masks from preprocessed BOLD runs."""
-
     root: Path = ctx_obj["root"]
     overrides = {"prep_dir": prep_dir, "image": image}
     cfg_model = load_epi_mask_config(root, overrides=overrides)

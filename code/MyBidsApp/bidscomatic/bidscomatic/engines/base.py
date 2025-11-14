@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Execution back-ends for running containerised tools."""
+
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Mapping, Sequence

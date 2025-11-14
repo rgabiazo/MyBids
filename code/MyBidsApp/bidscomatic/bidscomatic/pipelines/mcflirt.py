@@ -59,8 +59,14 @@ class _Paths:
 
 
 def _basename(in_file: Path) -> str:
-    """Return BIDS entity base name for *in_file* without suffix/desc."""
+    """Return the BIDS entity base name for *in_file* without suffix/desc.
 
+    Args:
+        in_file: Path to the BOLD file processed by MCFLIRT.
+
+    Returns:
+        Concatenated BIDS entities (sub, ses, task, etc.) without extensions.
+    """
     tags = re.findall(
         r"(sub-[^_]+|ses-[^_]+|task-[^_]+|acq-[^_]+|dir-[^_]+|run-[^_]+|space-[^_]+|res-[^_]+)",
         in_file.name,
@@ -69,8 +75,15 @@ def _basename(in_file: Path) -> str:
 
 
 def _build_paths(in_file: Path, base_override: Path | None = None) -> _Paths:
-    """Compute output paths for *in_file* inside the MCFLIRT dataset."""
+    """Compute derivative paths for *in_file* inside the MCFLIRT dataset.
 
+    Args:
+        in_file: BOLD image processed by MCFLIRT.
+        base_override: Optional dataset root overriding the file's dataset root.
+
+    Returns:
+        _Paths dataclass describing derivative directories and filenames.
+    """
     ds_root = dataset_root_or_raise(in_file)
     deriv_root = (base_override or ds_root) / "MCFLIRT"
 
@@ -115,8 +128,11 @@ def _build_paths(in_file: Path, base_override: Path | None = None) -> _Paths:
 
 
 def _ensure_dataset_description(root: Path) -> None:
-    """Create ``dataset_description.json`` in *root* if missing."""
+    """Create ``dataset_description.json`` in *root* if missing.
 
+    Args:
+        root: Derivatives directory that should contain the metadata file.
+    """
     dd = root / "dataset_description.json"
     if dd.exists():
         return
@@ -137,8 +153,13 @@ def _ensure_dataset_description(root: Path) -> None:
 
 
 def _par_to_tsv(par: Path, tsv: Path, js: Path) -> None:
-    """Convert an FSL ``.par`` file to TSV + JSON sidecar."""
+    """Convert an FSL ``.par`` file to TSV and JSON sidecar.
 
+    Args:
+        par: Path to the FSL ``.par`` motion parameter file.
+        tsv: Destination TSV file storing rotation and translation series.
+        js: Destination JSON file describing column metadata.
+    """
     cols = ["rot_x", "rot_y", "rot_z", "trans_x", "trans_y", "trans_z"]
     rows = [line.strip().split() for line in par.read_text().splitlines() if line.strip()]
 
@@ -194,8 +215,19 @@ def mcflirt_one(
     only_plot: bool = False,
     keep_nifti: bool = False,
 ) -> Path:
-    """Run MCFLIRT on a single BOLD file and create plots."""
+    """Run MCFLIRT on a single BOLD file and create plots.
 
+    Args:
+        in_file: Input BOLD image.
+        paths: Pre-computed derivative paths for this run.
+        ref: MCFLIRT reference volume (``"first"``, ``"middle"``, or ``"last"``).
+        size: Figure size passed to plotting routines.
+        only_plot: When ``True``, assume motion correction already exists and only plot.
+        keep_nifti: When ``True``, retain intermediate NIfTI products.
+
+    Returns:
+        Path to the generated motion TSV file.
+    """
     paths.logs_dir.mkdir(parents=True, exist_ok=True)
     paths.figures_dir.mkdir(parents=True, exist_ok=True)
 
@@ -379,8 +411,21 @@ def run(
     keep_nifti: bool = False,
     force: bool = False,
 ) -> List[Path]:
-    """Entry-point handling both single files and directories."""
+    """Entry point handling both single files and directories.
 
+    Args:
+        in_path: Path to a BOLD file or directory of files.
+        out: Optional derivative root overriding the dataset root.
+        ref: MCFLIRT reference volume selection.
+        size: Plot size passed to :func:`mcflirt_one`.
+        pattern: Glob pattern used when scanning directories.
+        only_plot: When ``True``, only render plots for existing results.
+        keep_nifti: When ``True``, keep intermediate NIfTI outputs.
+        force: When ``True``, rerun even if derivatives exist.
+
+    Returns:
+        List of motion TSV paths generated for each processed file.
+    """
     processed: List[Path] = []
 
     def _process_file(f: Path) -> None:

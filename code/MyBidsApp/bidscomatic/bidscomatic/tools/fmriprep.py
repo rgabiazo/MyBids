@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Wrapper for the fMRIPrep container."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path

@@ -1,3 +1,5 @@
+"""Test helpers for bidscomatic modules."""
+
 from pathlib import Path
 
 import numpy as np
@@ -16,23 +18,17 @@ def make_dataset(
 ) -> Path:
     """Create a minimal BIDS-like dataset with a single BOLD run.
 
-    Parameters
-    ----------
-    tmp_path:
-        Root temporary path for the dataset.
-    with_session:
-        Whether to include a ``ses-01`` directory level.
-    run:
-        Optional run label (e.g., ``"01"``) to include ``run-{run}`` in the
-        filename.
-    direction:
-        Optional phase-encoding direction tag to include ``dir-{direction}``.
-    n_vols:
-        Number of time points in the generated BOLD file.
-    boldref:
-        If ``True``, also create a corresponding ``*_boldref.nii.gz`` file.
-    """
+    Args:
+        tmp_path: Root temporary path for the dataset.
+        with_session: Whether to include a ``ses-01`` directory level.
+        run: Optional run label (e.g., ``"01"``) for inclusion in the filename.
+        direction: Optional phase-encoding direction tag (``dir-`` entity).
+        n_vols: Number of time points in the generated BOLD file.
+        boldref: When ``True``, create a corresponding ``*_boldref.nii.gz``.
 
+    Returns:
+        Path to the generated BOLD image.
+    """
     (tmp_path / "dataset_description.json").write_text("{}")
     root = tmp_path / "sub-001"
     func = root / ("ses-01/func" if with_session else "func")

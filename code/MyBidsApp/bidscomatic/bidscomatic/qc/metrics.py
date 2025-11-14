@@ -117,19 +117,21 @@ def load_mask(mask_path: Optional[str], bold_path: str) -> np.ndarray:
 
 
 def load_mask_allow(mask_path: Optional[str], bold_path: str, allow_naive: bool) -> np.ndarray:
-    """Load a mask or, if permitted, build a naive mask (mean image > 0).
+    """Load a mask or optionally construct a naive fallback.
 
-    Parameters
-    ----------
-    mask_path : str or None
-        Candidate mask file. If ``None`` or unreadable and ``allow_naive`` is
-        ``True``, a mask is built from the mean signal across time.
-    bold_path : str
-        Reference BOLD file used when constructing a naive mask.
-    allow_naive : bool
-        Whether a naive mask may be generated when no mask file is found.
+    Args:
+        mask_path: Candidate mask file. When ``None`` or unreadable and
+            ``allow_naive`` is ``True``, a mask is derived from the mean signal.
+        bold_path: Reference BOLD file used when constructing a naive mask.
+        allow_naive: Whether a naive mask may be generated when missing.
+
+    Returns:
+        Boolean NumPy array representing the selected mask.
+
+    Raises:
+        FileNotFoundError: Raised when ``allow_naive`` is ``False`` and
+            ``mask_path`` is absent or unreadable.
     """
-
     if mask_path:
         try:
             return nib.load(mask_path).get_fdata().astype(bool)

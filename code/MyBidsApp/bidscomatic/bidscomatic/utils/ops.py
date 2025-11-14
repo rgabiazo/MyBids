@@ -31,7 +31,6 @@ log = logging.getLogger(__name__)
 
 def _split_spec_tokens(spec: str) -> List[str]:
     """Split *spec* into whitespace separated tokens while honouring quotes."""
-
     tokens: List[str] = []
     buf: List[str] = []
     quote: str | None = None
@@ -102,7 +101,6 @@ def parse_kv_spec(spec: str) -> Dict[str, str]:
 
 def parse_mapping(raw: str, item_sep: str = ";", kv_sep: str = ":") -> Dict[str, str]:
     """Parse semi-colon separated ``key:val`` strings into a mapping."""
-
     mapping: Dict[str, str] = {}
     for chunk in raw.split(item_sep):
         if not chunk.strip():
@@ -120,7 +118,6 @@ _ONSET_RE = re.compile(r"^first\.(?P<col>\w+)(?P<off>[+-]\d+(?:\.\d+)?)?$")
 
 def _parse_onset_expr(expr: str) -> tuple[str, float]:
     """Parse onset expressions like ``first.onset-10`` or ``first.onset+5``."""
-
     match = _ONSET_RE.fullmatch(expr.strip())
     if not match:
         raise ValueError(expr)
@@ -295,7 +292,6 @@ def _key_tuples(df: pd.DataFrame, keys: Sequence[str]) -> Sequence[tuple]:
     callers to keep alignment with the original frame while skipping such rows
     from join lookups.
     """
-
     tuples: List[tuple | None] = []
     for row in df[list(keys)].itertuples(index=False, name=None):
         if any(pd.isna(val) for val in row):
@@ -709,7 +705,6 @@ def apply_ops(df: pd.DataFrame, ops: Iterable[tuple[str, Dict[str, Any]]]) -> pd
     Unknown operators are skipped with a warning.  Each operator receives the
     frame and keyword arguments extracted from the corresponding spec.
     """
-
     for name, params in ops:
         fn = OPS.get(name)
         if fn is None:

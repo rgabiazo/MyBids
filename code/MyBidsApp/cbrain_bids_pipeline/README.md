@@ -455,26 +455,7 @@ INFO: Task created for 'hippunfold' on cluster 'rorqual':
 { "id": 123457, "type": "BoutiquesTask::Hippunfold", ... }
 ```
 
-### fMRIPrep — batch
-
-```console
-(.venv) user@host BrainProject % cbrain-cli --launch-tool FMRIprepBidsSubject \
-  --tool-param interface_userfile_ids='[7201]' \
-  --tool-param fs_license_file=7201 \
-  --tool-param output_spaces='["MNI152NLin6Asym","MNI152NLin2009cAsym:res-2"]' \
-  --tool-param anat_only=true \
-  --tool-param low_mem=true \
-  --tool-param no_reconall=true \
-  --launch-tool-batch-group BrainProject \
-  --launch-tool-batch-type BidsSubject \
-  --launch-tool-bourreau-id 110 \
-  --launch-tool-results-dp-id 51
-INFO: token retrieved for user@example.com
-INFO: Task created for 'FMRIprepBidsSubject' on cluster 'fir':
-{ "id": 234567, "type": "BoutiquesTask::FMRIprepBidsSubject", ... }
-```
-
-### fMRIPrep — single subject on **Rorqual**
+### fMRIPrep — single subject
 
 ```console
 (.venv) user@host SampleBidsProject % cbrain-cli --launch-tool FMRIprepBidsSubject \
@@ -495,7 +476,7 @@ INFO: Task created for 'FMRIprepBidsSubject' on cluster 'rorqual':
 { "id": 234567, "type": "BoutiquesTask::FMRIprepBidsSubject", ... }
 ```
 
-### fMRIPrep — **Recon-all** for single subject on **Rorqual**
+### fMRIPrep — **Recon-all** for single subject
 
 ```console
 (.venv) user@host ExampleBidsProject % cbrain-cli --launch-tool FMRIprepBidsSubject \
@@ -574,12 +555,42 @@ INFO: Task created for 'FMRIprepBidsSubject' on cluster 'rorqual':
 }
 ```
 
+### fMRIPrep — batch
+
+```console
+(.venv) user@host BrainProject % cbrain-cli --launch-tool FMRIprepBidsSubject \
+  --tool-param interface_userfile_ids='[7201]' \
+  --tool-param fs_license_file=7201 \
+  --tool-param output_spaces='["MNI152NLin6Asym","MNI152NLin2009cAsym:res-2"]' \
+  --tool-param anat_only=true \
+  --tool-param low_mem=true \
+  --tool-param no_reconall=true \
+  --launch-tool-batch-group BrainProject \
+  --launch-tool-batch-type BidsSubject \
+  --launch-tool-bourreau-id 110 \
+  --launch-tool-results-dp-id 51
+INFO: token retrieved for user@example.com
+INFO: Task created for 'FMRIprepBidsSubject' on cluster 'fir':
+{ "id": 234567, "type": "BoutiquesTask::FMRIprepBidsSubject", ... }
+```
+
 ### DeepPrep — **anatomical only**, single subject 
 
 > **Task labels.** DeepPrep expects BOLD runs with a task label (e.g., `task1`, `rest`, `motor`, etc.). If you want to run anatomical processing, provide task label a placeholder and set anat_only=true.
 
 ```console
-(.venv) user@host DemoProject % cbrain-cli --launch-tool deepprep   --launch-tool-group-id SampleBidsProject   --launch-tool-bourreau-id 110   --launch-tool-results-dp-id 51   --tool-param bids_dir=6067624   --tool-param interface_userfile_ids='[6085435,6067624]'   --tool-param fs_license_file=6085435   --tool-param bold_task_type="assocmemory"   --tool-param anat_only=true   --custom-output 'output_dir_name="{bids_dir}-{cortthickness}"'   --tool-param cbrain_enable_output_cache_cleaner=false
+(.venv) user@host DemoProject % cbrain-cli --launch-tool deepprep   
+    --group-id SampleBidsTest \
+    --launch-tool-group-id SampleBidsProject \
+    --launch-tool-bourreau-id 110 \
+    --launch-tool-results-dp-id 51 \
+    --tool-param bids_dir=6067624
+    --tool-param interface_userfile_ids='[6085435,6067624]' \
+    --tool-param fs_license_file=6085435 \
+    --tool-param bold_task_type="assocmemory" \
+    --tool-param anat_only=true \
+    --custom-output 'output_dir_name="{bids_dir}-{cortthickness}"' \ 
+    --tool-param cbrain_enable_output_cache_cleaner=false
 INFO: Retrieved new CBRAIN token for user 'demo_user'
 INFO: [INFO] Custom output output_dir_name resolved to sub-002-cortthickness
 INFO: Task created for 'deepprep' on cluster 'fir':
@@ -629,7 +640,16 @@ INFO: Task created for 'deepprep' on cluster 'fir':
 ### DeepPrep — fMRI preprocessing **batch** 
 
 ```console
-(.venv) user@host DemoProject % cbrain-cli --launch-tool deepprep     --launch-tool-batch-group SampleBidsProject     --launch-tool-batch-type BidsSubject     --launch-tool-bourreau-id 110     --launch-tool-results-dp-id 51     --tool-param interface_userfile_ids='[6085435]'     --tool-param fs_license_file=6085435     --tool-param bold_task_type="assocmemory"     --custom-output 'output_dir_name="{bids_dir}-{bold_task_type}"'     --tool-param cbrain_enable_output_cache_cleaner=false
+(.venv) user@host DemoProject % cbrain-cli --launch-tool deepprep
+    --launch-tool-batch-group SampleBidsProject \
+    --launch-tool-batch-type BidsSubject \
+    --launch-tool-bourreau-id 110 \
+    --launch-tool-results-dp-id 51 \
+    --tool-param interface_userfile_ids='[6085435]' \
+    --tool-param fs_license_file=6085435 \
+    --tool-param bold_task_type="assocmemory" \
+    --custom-output 'output_dir_name="{bids_dir}-{bold_task_type}"' \
+    --tool-param cbrain_enable_output_cache_cleaner=false 
 INFO: Retrieved new CBRAIN token for user 'demo_user'
 INFO: [BATCH 6067624] Launching 'deepprep' (dry_run=False)…
 INFO: [INFO] Custom output output_dir_name resolved to sub-002-assocmemory

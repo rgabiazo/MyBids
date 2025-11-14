@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Wrappers around selected FSL tools."""
+
+from __future__ import annotations
 
 from pathlib import Path
 import click

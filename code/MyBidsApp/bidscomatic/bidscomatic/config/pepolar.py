@@ -1,12 +1,12 @@
-from __future__ import annotations
-
 """Configuration model for the pepolar preprocessing pipeline.
 
 The dataclass collects all knobs that influence how opposite phase-encoding
-fieldmaps are derived from functional runs.  Default values mirror the shell
+fieldmaps are derived from functional runs. Default values mirror the shell
 script used historically so that existing behaviour remains unchanged when the
 Python pipeline is adopted.
 """
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 

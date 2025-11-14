@@ -53,7 +53,6 @@ def _compute_metrics(
     and the QC output directory already exists under the dataset-level ``qc``
     folder, ``(None, None)`` is returned to indicate the run was skipped.
     """
-
     run_stem = Path(bold.path).name.replace(".nii.gz", "")
     qc_dir = qc_run_dir(Path(bold.path), stem=run_stem)
     if qc_dir.exists() and not overwrite:

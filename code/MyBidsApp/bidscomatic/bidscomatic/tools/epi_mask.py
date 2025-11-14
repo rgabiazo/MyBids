@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Generate robust brain masks for BOLD series."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -137,17 +137,11 @@ class EpiMaskTool(Tool):
 def run_native(cfg: EpiMaskConfig, subjects: Sequence[str], tasks: Sequence[str] | None = None) -> None:
     """Generate EPI masks without requiring Docker.
 
-    Parameters
-    ----------
-    cfg
-        Configuration object describing the preprocessed derivatives
-        directory and thread settings.
-    subjects
-        Iterable of subject identifiers (with or without ``sub-`` prefix).
-    tasks
-        Optional list of task labels to restrict the runs that are processed.
+    Args:
+        cfg: Configuration describing derivatives location and thread settings.
+        subjects: Iterable of subject identifiers (with or without ``sub-``).
+        tasks: Optional list of task labels used to filter runs.
     """
-
     import glob
     import logging
     import re

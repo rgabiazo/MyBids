@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Tool-specific configuration loaders."""
+
+from __future__ import annotations
 
 from pathlib import Path
 from importlib.resources import files
@@ -44,7 +44,6 @@ def _resolve(root: Path | None) -> Path:
 
 def load_aroma_config(root: Path, overrides: dict | None = None) -> AromaConfigModel:
     """Load configuration for fMRIPost-AROMA."""
-
     overrides = overrides or {}
     path = _resolve(root)
     data = yaml.safe_load(path.read_text()) or {}
@@ -92,7 +91,6 @@ def _resolve_fmriprep(root: Path | None) -> Path:
 
 def load_fmriprep_config(root: Path, overrides: dict | None = None) -> FmriprepConfigModel:
     """Load configuration for fMRIPrep."""
-
     overrides = overrides or {}
     path = _resolve_fmriprep(root)
     data = yaml.safe_load(path.read_text()) or {}
@@ -134,7 +132,6 @@ def _resolve_epi_mask(root: Path | None) -> Path:
 
 def load_epi_mask_config(root: Path, overrides: dict | None = None) -> EpiMaskConfigModel:
     """Load configuration for EPI mask generation."""
-
     overrides = overrides or {}
     path = _resolve_epi_mask(root)
     data = yaml.safe_load(path.read_text()) or {}
@@ -169,7 +166,6 @@ def _resolve_mcflirt(root: Path | None) -> Path:
 
 def load_mcflirt_config(root: Path, overrides: dict | None = None) -> McflirtConfigModel:
     """Load configuration for MCFLIRT."""
-
     overrides = overrides or {}
     path = _resolve_mcflirt(root)
     data = yaml.safe_load(path.read_text()) or {}

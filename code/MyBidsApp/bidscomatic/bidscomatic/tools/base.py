@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Base classes for containerised tools."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Mapping, Sequence
