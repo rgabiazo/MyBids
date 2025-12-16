@@ -148,6 +148,13 @@ def get_api_client(base_url: str, token: str) -> ApiClient:
     """
     cfg = Configuration()
     cfg.host = base_url.rstrip("/")
+
+    # Test stubs may provide a bare object without the ``api_key`` mapping the
+    # real OpenAPI ``Configuration`` exposes. Ensure the attribute exists so the
+    # token injection works uniformly in both real and stubbed environments.
+    if not hasattr(cfg, "api_key"):
+        cfg.api_key = {}
+
     cfg.api_key["BrainPortalSession"] = token  # API expects this key name
     return ApiClient(configuration=cfg)
 

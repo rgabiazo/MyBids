@@ -513,6 +513,17 @@ def main() -> None:
         metavar="SRC=DEST",
         help="Replace local suffix SRC with remote DEST during upload.",
     )
+    upload_grp.add_argument(
+        "--upload-normalize-paths",
+        action="store_true",
+        help=(
+            "Rewrite embedded absolute paths inside text files before upload "
+            "(e.g., BIDS IntendedFor, FSL design .fsf files). "
+            "Original files on disk are left untouched; normalized copies are "
+            "staged in a temporary directory."
+        ),
+    )
+
 
     # -----------------------------------------------------------------
     # Tool listing / metadata
@@ -1193,6 +1204,7 @@ def main() -> None:
             dry_run=args.upload_dry_run,
             remote_root=args.upload_remote_root,
             path_map=dict(args.upload_path_map) if args.upload_path_map else None,
+            rewrite_absolute_paths=args.upload_normalize_paths,
         )
 
     # Tool metadata operations

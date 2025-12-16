@@ -134,6 +134,7 @@ filetype_inference:
   patterns:
     "*.json": JsonFile
     "*.txt": TextFile
+    "*.fsf": FslDesignFile     # standard FEAT design files
     "dataset_description.json": JsonFile
     "sub-*": BidsSubject
 ```

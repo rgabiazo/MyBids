@@ -54,7 +54,7 @@ This CLI and Python helper connect a local, BIDS‑structured dataset to CBRAIN.
 1) **Validate** your BIDS dataset:
 
 ```bash
-cbrain-cli --bids-validator sub-* ses-*
+cbrain-cli --bids-validator sub-\* ses-\*
 ```
 
 2) **Create a project** (CBRAIN calls these *groups*):
@@ -66,7 +66,11 @@ cbrain-cli --create-group "DemoProject" --group-description "hello-world run"
 3) **Upload a tiny subset** (one subject/session) and register it on provider **51**:
 
 ```bash
-cbrain-cli --upload-bids-and-sftp-files sub-001 ses-01 anat   --upload-register --upload-dp-id 51 --upload-group-id DemoProject
+cbrain-cli \
+  --upload-bids-and-sftp-files sub-001 ses-01 anat \
+  --upload-register \
+  --upload-dp-id 51 \
+  --upload-group-id DemoProject
 ```
 
 4) **Launch one task** (pick *one* of the following):
@@ -74,14 +78,14 @@ cbrain-cli --upload-bids-and-sftp-files sub-001 ses-01 anat   --upload-register 
 - **HippUnfold (minimal)**
 
 ```bash
-cbrain-cli --launch-tool hippunfold   --group-id DemoProject   --tool-param interface_userfile_ids=UFID   --tool-param subject_dir=UFID
+cbrain-cli --launch-tool hippunfold --group-id DemoProject --tool-param interface_userfile_ids=UFID --tool-param subject_dir=UFID
 ```
 
 - **fMRIPrep (requires a FreeSurfer license)**
 
 ```bash
 # Upload your FreeSurfer license.txt first and note its userfile ID (e.g., 7201)
-cbrain-cli --launch-tool FMRIprepBidsSubject   --group-id DemoProject   --tool-param interface_userfile_ids='[7201,UFID]'   --tool-param bids_dir=UFID   --tool-param fs_license_file=7201   --tool-param anat_only=true --tool-param low_mem=true
+cbrain-cli --launch-tool FMRIprepBidsSubject --group-id DemoProject --tool-param interface_userfile_ids='[7201,UFID]' --tool-param bids_dir=UFID --tool-param fs_license_file=7201 --tool-param anat_only=true --tool-param low_mem=true
 ```
 
 > Replace **UFID** with the CBRAIN *userfile ID* of your uploaded subject. A practical way to find it is `cbrain-cli --list-userfiles-group DemoProject`.
@@ -93,14 +97,14 @@ cbrain-cli --launch-tool FMRIprepBidsSubject   --group-id DemoProject   --tool-p
 cbrain-cli --task-status DemoProject --task-type hippunfold
 
 # Then download HippUnfold outputs into derivatives/hippunfold
-cbrain-cli download --tool hippunfold   --output-type HippunfoldOutput   --group DemoProject --flatten --skip-dirs config logs work
+cbrain-cli download --tool hippunfold --output-type HippunfoldOutput --group DemoProject --flatten --skip-dirs config logs work
 ```
 
 ---
 
 ## Highlights
 
-- **BIDS‑aware** – runs the *bids‑validator*; understands `sub-*/ses-*` hierarchy.
+- **BIDS‑aware** – runs the *bids‑validator*; understands `sub-\*/ses-\*` hierarchy.
 - **Zero‑boilerplate CBRAIN tasks** – discovers `tool_config_id` & `bourreau_id` automatically.
 - **SFTP sync helpers** – compare / upload / download only the delta.
 - **Config in YAML, secrets in env vars** – opinionated defaults; easy overrides.
@@ -256,7 +260,7 @@ export CBRAIN_TIMEOUT=60  # HTTP request timeout in seconds (default 60)
 For one‑off commands you can also inline credentials:
 
 ```bash
-CBRAIN_USERNAME=alice@example.com CBRAIN_PASSWORD='your_password'   cbrain-cli --bids-validator sub-* ses-*
+CBRAIN_USERNAME=alice@example.com CBRAIN_PASSWORD='your_password'   cbrain-cli --bids-validator sub-\* ses-\*
 ```
 
 ---
@@ -338,7 +342,7 @@ Found 1 userfile(s) in group Trial on provider 4.
 Initialize a CBRAIN project (group) to organize uploaded datasets and launched tasks.
 
 ```bash
-cbrain-cli --create-group "MyTrial"   --group-description "test dataset"
+cbrain-cli --create-group "MyTrial" --group-description "test dataset"
 ```
 
 On success:
@@ -364,7 +368,11 @@ Created group ID=42 name=DemoProject
 CBRAIN userfiles can belong to multiple projects. When uploading to a second project, provide the destination via `--upload-group-id` (ID or name):
 
 ```bash
-cbrain-cli --upload-bids-and-sftp-files sub-* --upload-register   --upload-dp-id 51 --upload-group-id 456
+cbrain-cli \
+  --upload-bids-and-sftp-files sub-\* \
+  --upload-register \
+  --upload-dp-id 51 \
+  --upload-group-id 456
 ```
 
 > **Note** Re‑uploading a file with the same name to the **same** Data Provider is skipped; each provider keeps a single copy per filename.
@@ -384,15 +392,29 @@ Optionally relocate the file when combined with `--move-to-provider`.
 Use `--upload-bids-and-sftp-files` with one or more file globs:
 
 ```bash
-cbrain-cli --upload-bids-and-sftp-files dataset_description.json   --upload-register --upload-dp-id 51 --upload-group-id NewProject
+cbrain-cli \
+  --upload-bids-and-sftp-files dataset_description.json \
+  --upload-register \
+  --upload-dp-id 51 \
+  --upload-group-id NewProject
 ```
 
 ```bash
-cbrain-cli --upload-bids-and-sftp-files sub-* ses-01 anat   --upload-register --upload-dp-id 51   --upload-filetypes BidsSubject   --upload-group-id NewProject
+cbrain-cli \
+  --upload-bids-and-sftp-files sub-\* ses-01 anat \
+  --upload-register \
+  --upload-dp-id 51 \
+  --upload-filetypes BidsSubject \
+  --upload-group-id NewProject
 ```
 
 ```console
-$ cbrain-cli --upload-bids-and-sftp-files sub-* ses-01 anat   --upload-register --upload-dp-id 51   --upload-filetypes BidsSubject   --upload-group-id DemoProject
+$ cbrain-cli \
+  --upload-bids-and-sftp-files sub-\* ses-01 anat \
+  --upload-register \
+  --upload-dp-id 51 \
+  --upload-filetypes BidsSubject \
+  --upload-group-id DemoProject
 INFO: token retrieved for user@example.com
 INFO: Uploaded 6 file(s) to provider 51
 INFO: Registered 6 userfile(s) in project DemoProject
@@ -400,18 +422,50 @@ INFO: Registered 6 userfile(s) in project DemoProject
 
 Missing folders are skipped entirely. Single files inside `derivatives/` are uploaded at the dataset root (e.g., `derivatives/license.txt` → `/license.txt`).
 
+Rewrite **absolute** paths embedded inside text files (e.g., `.fsf`, `.tsv`, `.json`) to CBRAIN-friendly relatives with `--upload-normalize-paths`. The original files on disk are left untouched; normalized copies are staged automatically. Example uploads:
+
+```bash
+cbrain-cli \
+  --upload-bids-and-sftp-files derivatives fsl feat fsf 'sub-002*.fsf' \
+  --upload-register \
+  --upload-dp-id 51 \
+  --upload-group-id FslTest \
+  --upload-normalize-paths
+```
+
+```bash
+cbrain-cli \
+  --upload-bids-and-sftp-files derivatives fsl feat fsf \*.fsf \
+  --upload-register \
+  --upload-dp-id 51 \
+  --upload-group-id FslTest \
+  --upload-normalize-paths \
+  --upload-dry-run
+```
+
 **Dry run** without transferring files:
 
 ```bash
-cbrain-cli --upload-bids-and-sftp-files sub-* ses-01 anat   --upload-dp-id 51 --upload-dry-run
+cbrain-cli \
+  --upload-bids-and-sftp-files sub-\* ses-01 anat \
+  --upload-dp-id 51 \
+  --upload-dry-run
 ```
 
 Example uploading the same file to two different providers:
 
 ```console
-$ cbrain-cli   --upload-bids-and-sftp-files participants.tsv   --upload-register   --upload-dp-id 51   --upload-group-id DemoBids
+$ cbrain-cli \
+  --upload-bids-and-sftp-files participants.tsv \
+  --upload-register \
+  --upload-dp-id 51 \
+  --upload-group-id DemoBids
 ...
-$ cbrain-cli   --upload-bids-and-sftp-files participants.tsv   --upload-register   --upload-dp-id 32   --upload-group-id DemoBids
+$ cbrain-cli \
+  --upload-bids-and-sftp-files participants.tsv \
+  --upload-register \
+  --upload-dp-id 32 \
+  --upload-group-id DemoBids
 ...
 ```
 
@@ -579,17 +633,17 @@ INFO: Task created for 'FMRIprepBidsSubject' on cluster 'fir':
 > **Task labels.** DeepPrep expects BOLD runs with a task label (e.g., `task1`, `rest`, `motor`, etc.). If you want to run anatomical processing, provide task label a placeholder and set anat_only=true.
 
 ```console
-(.venv) user@host DemoProject % cbrain-cli --launch-tool deepprep   
+(.venv) user@host DemoProject % cbrain-cli --launch-tool deepprep \
     --group-id SampleBidsTest \
     --launch-tool-group-id SampleBidsProject \
     --launch-tool-bourreau-id 110 \
     --launch-tool-results-dp-id 51 \
-    --tool-param bids_dir=6067624
+    --tool-param bids_dir=6067624 \
     --tool-param interface_userfile_ids='[6085435,6067624]' \
     --tool-param fs_license_file=6085435 \
     --tool-param bold_task_type="assocmemory" \
     --tool-param anat_only=true \
-    --custom-output 'output_dir_name="{bids_dir}-{cortthickness}"' \ 
+    --custom-output 'output_dir_name="{bids_dir}-{cortthickness}"' \
     --tool-param cbrain_enable_output_cache_cleaner=false
 INFO: Retrieved new CBRAIN token for user 'demo_user'
 INFO: [INFO] Custom output output_dir_name resolved to sub-002-cortthickness
@@ -640,7 +694,7 @@ INFO: Task created for 'deepprep' on cluster 'fir':
 ### DeepPrep — fMRI preprocessing **batch** 
 
 ```console
-(.venv) user@host DemoProject % cbrain-cli --launch-tool deepprep
+(.venv) user@host DemoProject % cbrain-cli --launch-tool deepprep \
     --launch-tool-batch-group SampleBidsProject \
     --launch-tool-batch-type BidsSubject \
     --launch-tool-bourreau-id 110 \
@@ -713,7 +767,17 @@ can reference any parameter passed via `--tool-param`.  Unknown placeholders are
 kept as literal text, making it easy to mix dynamic values with fixed suffixes.
 
 ```console
-$ cbrain-cli --launch-tool deepprep   --launch-tool-group-id SampleBidsProject   --launch-tool-bourreau-id 110   --launch-tool-results-dp-id 51   --tool-param bids_dir=123457   --tool-param interface_userfile_ids='[89101115,123457]'   --tool-param fs_license_file=8910111   --tool-param bold_task_type="assocmemory"   --tool-param anat_only=true   --custom-output 'output_dir_name="{bids_dir}-{cortthickness}"'   --tool-param cbrain_enable_output_cache_cleaner=false
+$ cbrain-cli --launch-tool deepprep \
+    --launch-tool-group-id SampleBidsProject \
+    --launch-tool-bourreau-id 110 \
+    --launch-tool-results-dp-id 51 \
+    --tool-param bids_dir=123457 \
+    --tool-param interface_userfile_ids='[89101115,123457]' \
+    --tool-param fs_license_file=8910111 \
+    --tool-param bold_task_type="assocmemory" \
+    --tool-param anat_only=true \
+    --custom-output 'output_dir_name="{bids_dir}-{cortthickness}"' \
+    --tool-param cbrain_enable_output_cache_cleaner=false
 INFO: Retrieved new CBRAIN token for user 'demo_user'
 INFO: [INFO] Custom output output_dir_name resolved to sub-002-cortthickness
 INFO: Task created for 'deepprep' on cluster 'fir':
@@ -815,7 +879,7 @@ cbrain-cli --error-recover-failed DemoProject --task-type hippunfold
 Retrieve derivatives with `cbrain-cli download`:
 
 ```bash
-cbrain-cli download --tool hippunfold   --output-type HippunfoldOutput --group 42
+cbrain-cli download --tool hippunfold --output-type HippunfoldOutput --group 42
 ```
 
 ```console
@@ -828,7 +892,7 @@ You can also fetch a **single** CBRAIN file via `--id <USERFILE>` (omit `--group
 
 - `--flatten` – drop wrapper directory so outputs land directly under subject/session;
 - `--skip-dirs <NAME ...>` – ignore folders like `logs` or `work`;
-- `--only-dirs <PATTERN ...>` – restrict downloads (e.g., `sub-*/figures`, `sub-*/ses-*/anat`);
+- `--only-dirs <PATTERN ...>` – restrict downloads (e.g., `sub-\*/figures`, `sub-\*/ses-\*/anat`);
 - `--output-dir NAME` – write under `derivatives/NAME` instead of the default;
 - `--download-path-map REMOTE=LOCAL` – place a remote directory under a different relative path (repeatable);
 - `--normalize session|subject` – ensure filenames include session/subject labels.
@@ -836,7 +900,7 @@ You can also fetch a **single** CBRAIN file via `--id <USERFILE>` (omit `--group
 **Example (store fMRIPrep results under `derivatives/fmriprep`)**
 
 ```bash
-cbrain-cli download --tool FMRIprepBidsSubject   --output-type FmriPrepOutput --group DemoProject   --output-dir fmriprep --flatten --skip-dirs logs
+cbrain-cli download --tool FMRIprepBidsSubject --output-type FmriPrepOutput --group DemoProject --output-dir fmriprep --flatten --skip-dirs logs
 ```
 
 > If you intentionally want a different layout (e.g., to merge results into a multi‑tool tree), use `--output-dir` and `--download-path-map` to remap directories.
@@ -872,13 +936,15 @@ Combine aliasing with other operations:
 
 ```bash
 # alias before uploading
-cbrain-cli --alias "assocmemory=6cat" --upload-bids-and-sftp-files sub-005
+cbrain-cli \
+  --alias "assocmemory=6cat" \
+  --upload-bids-and-sftp-files sub-005
 
 # or alias after downloading derivatives
-cbrain-cli download --tool deepprep   --alias derivatives DeepPrep BOLD sub-* ses-* func "6cat=assocmemory"   --group DemoProject
+cbrain-cli download --tool deepprep --alias derivatives DeepPrep BOLD sub-\* ses-\* func "6cat=assocmemory" --group DemoProject
 ```
 
-> The optional `sub-*` / `ses-*` placeholders are ignored when determining the base directory, so the command automatically descends into the `sub-*/ses-*` hierarchy.
+> The optional `sub-\*` / `ses-\*` placeholders are ignored when determining the base directory, so the command automatically descends into the `sub-\*/ses-\*` hierarchy.
 
 ---
 

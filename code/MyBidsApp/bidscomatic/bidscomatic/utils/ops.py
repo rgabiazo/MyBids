@@ -280,7 +280,7 @@ def op_map_values(
         # Ensure mapping keys match the lower-cased values
         mapping = {str(k).lower(): v for k, v in mapping.items()}
     mapped = series.map(mapping)
-    fallback = original if not casefold else original
+    fallback = original if not casefold else series
     df[newcol] = mapped.fillna(fallback)
     return df
 

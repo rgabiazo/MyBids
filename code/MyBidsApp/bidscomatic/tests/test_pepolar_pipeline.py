@@ -84,9 +84,25 @@ def test_extract_final_matrix_strips_trailing_block():
     assert cleaned.endswith("extra")
 
 
+def _make_with_func(root: Path, trt: float = 0.1) -> None:
+    """Populate the dataset with a single functional run and metadata.
+
+    Args:
+        root: Dataset root directory prepared by the test fixture.
+        trt: Total readout time stored in the functional JSON sidecar.
+    """
+    _make_dataset(root)
+    func = root / "sub-001" / "ses-01" / "func"
+    func.mkdir(parents=True)
+    (func / "sub-001_ses-01_task-test_bold.nii.gz").touch()
+    (func / "sub-001_ses-01_task-test_bold.json").write_text(
+        json.dumps({"PhaseEncodingDirection": "j-", "TotalReadoutTime": trt})
+    )
+
+
 def test_derive_creates_missing(tmp_path):
     """Verify derive creates missing behavior."""
-    _make_dataset(tmp_path)
+    _make_with_func(tmp_path)
     ss = [SubjectSession(root=tmp_path, sub="sub-001", ses="ses-01")]
     cfg = PepolarConfig(dry_run=False)
     out = derive_pepolar_fieldmaps(tmp_path, ss, cfg)
@@ -260,42 +276,23 @@ def test_both_directions_present(tmp_path):
     assert out == []
 
 
-def test_no_functionals(tmp_path):
-    """Verify NO functionals behavior."""
+def test_no_functionals_raises(tmp_path):
+    """When no func/ directory exists, pepolar cannot derive an opposite EPI."""
     _make_dataset(tmp_path)
     ss = [SubjectSession(root=tmp_path, sub="sub-001", ses="ses-01")]
-    cfg = PepolarConfig()
-    out = derive_pepolar_fieldmaps(tmp_path, ss, cfg)
-    expect = tmp_path / "sub-001" / "ses-01" / "fmap" / "sub-001_ses-01_dir-AP_epi.json"
-    js = json.loads(expect.read_text())
-    assert js["IntendedFor"] == []
+    with pytest.raises(PePolarError):
+        derive_pepolar_fieldmaps(tmp_path, ss, PepolarConfig())
 
 
 def test_dry_run(tmp_path):
     """Verify DRY RUN behavior."""
-    _make_dataset(tmp_path)
+    _make_with_func(tmp_path)
     ss = [SubjectSession(root=tmp_path, sub="sub-001", ses="ses-01")]
     cfg = PepolarConfig(dry_run=True)
     out_paths = derive_pepolar_fieldmaps(tmp_path, ss, cfg)
     out = tmp_path / "sub-001" / "ses-01" / "fmap" / "sub-001_ses-01_dir-AP_epi.nii.gz"
     assert out in out_paths
     assert not out.exists()
-
-
-def _make_with_func(root: Path, trt: float = 0.1) -> None:
-    """Populate the dataset with a single functional run and metadata.
-
-    Args:
-        root: Dataset root directory prepared by the test fixture.
-        trt: Total readout time stored in the functional JSON sidecar.
-    """
-    _make_dataset(root)
-    func = root / "sub-001" / "ses-01" / "func"
-    func.mkdir(parents=True)
-    (func / "sub-001_ses-01_task-test_bold.nii.gz").touch()
-    (func / "sub-001_ses-01_task-test_bold.json").write_text(
-        json.dumps({"PhaseEncodingDirection": "j-", "TotalReadoutTime": trt})
-    )
 
 
 def test_use_bids_uri(tmp_path):
@@ -444,3 +441,96 @@ def test_fsl_failure_raises(tmp_path, monkeypatch):
     ss = [SubjectSession(root=tmp_path, sub="sub-001", ses="ses-01")]
     with pytest.raises(PePolarError):
         derive_pepolar_fieldmaps(tmp_path, ss, PepolarConfig())
+
+
+def test_dir_pairs_lr_rl(tmp_path):
+    """Support LR/RL `dir-` pairs by default."""
+    (tmp_path / "dataset_description.json").write_text("{}")
+    fmap = tmp_path / "sub-001" / "ses-01" / "fmap"
+    fmap.mkdir(parents=True)
+    (fmap / "sub-001_ses-01_dir-LR_epi.nii.gz").touch()
+    (fmap / "sub-001_ses-01_dir-LR_epi.json").write_text(
+        json.dumps({"PhaseEncodingDirection": "i", "TotalReadoutTime": 0.1})
+    )
+
+    func = tmp_path / "sub-001" / "ses-01" / "func"
+    func.mkdir(parents=True)
+    (func / "sub-001_ses-01_task-test_bold.nii.gz").touch()
+    (func / "sub-001_ses-01_task-test_bold.json").write_text(
+        json.dumps({"PhaseEncodingDirection": "i-", "TotalReadoutTime": 0.1})
+    )
+
+    ss = [SubjectSession(root=tmp_path, sub="sub-001", ses="ses-01")]
+    out = derive_pepolar_fieldmaps(tmp_path, ss, PepolarConfig())
+    expect = tmp_path / "sub-001" / "ses-01" / "fmap" / "sub-001_ses-01_dir-RL_epi.nii.gz"
+    assert expect in out
+    assert expect.exists()
+
+
+def test_selection_filters_to_missing_ped(tmp_path, monkeypatch):
+    """Only runs matching the missing ped are used to build the opposite fmap."""
+    _make_dataset(tmp_path)
+
+    func = tmp_path / "sub-001" / "ses-01" / "func"
+    func.mkdir(parents=True)
+
+    # One run matches the missing ped (j-), one run matches canonical ped (j)
+    for run, ped in (("01", "j-"), ("02", "j")):
+        bold = func / f"sub-001_ses-01_run-{run}_task-test_bold.nii.gz"
+        bold.touch()
+        (bold.with_suffix("").with_suffix(".json")).write_text(
+            json.dumps({"PhaseEncodingDirection": ped, "TotalReadoutTime": 0.1})
+        )
+
+    calls: list[str] = []
+
+    def record(cmd, *, capture=False, on_stdout=None, suppress_final_result_from_live=False):
+        calls.append(cmd[0])
+        cmd0 = cmd[0]
+        if cmd0 == "mcflirt":
+            base = Path(cmd[4])
+            base.with_suffix(".nii.gz").touch()
+            base.with_suffix(".par").touch()
+            if capture:
+                return subprocess.CompletedProcess(cmd, 0, stdout=MCFLIRT_STDOUT)
+        elif cmd0 == "fslmaths":
+            Path(cmd[-1]).touch()
+        elif cmd0 == "flirt":
+            Path(cmd[6]).touch()
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(fsl, "run_cmd", record)
+
+    ss = [SubjectSession(root=tmp_path, sub="sub-001", ses="ses-01")]
+    derive_pepolar_fieldmaps(tmp_path, ss, PepolarConfig())
+
+    # Only one missing-ped run -> only one mcflirt call
+    assert calls.count("mcflirt") == 1
+
+    out_json = tmp_path / "sub-001" / "ses-01" / "fmap" / "sub-001_ses-01_dir-AP_epi.json"
+    meta = json.loads(out_json.read_text())
+    assert len(meta["IntendedFor"]) == 2
+
+
+def test_output_preserves_other_entities(tmp_path):
+    """If canonical fieldmaps include extra entities (e.g., acq-), keep them."""
+    (tmp_path / "dataset_description.json").write_text("{}")
+    fmap = tmp_path / "sub-001" / "ses-01" / "fmap"
+    fmap.mkdir(parents=True)
+    (fmap / "sub-001_ses-01_acq-sefm_dir-PA_epi.nii.gz").touch()
+    (fmap / "sub-001_ses-01_acq-sefm_dir-PA_epi.json").write_text(
+        json.dumps({"PhaseEncodingDirection": "j", "TotalReadoutTime": 0.1})
+    )
+
+    func = tmp_path / "sub-001" / "ses-01" / "func"
+    func.mkdir(parents=True)
+    (func / "sub-001_ses-01_task-test_bold.nii.gz").touch()
+    (func / "sub-001_ses-01_task-test_bold.json").write_text(
+        json.dumps({"PhaseEncodingDirection": "j-", "TotalReadoutTime": 0.1})
+    )
+
+    ss = [SubjectSession(root=tmp_path, sub="sub-001", ses="ses-01")]
+    out = derive_pepolar_fieldmaps(tmp_path, ss, PepolarConfig())
+    expect = tmp_path / "sub-001" / "ses-01" / "fmap" / "sub-001_ses-01_acq-sefm_dir-AP_epi.nii.gz"
+    assert expect in out
+    assert expect.exists()

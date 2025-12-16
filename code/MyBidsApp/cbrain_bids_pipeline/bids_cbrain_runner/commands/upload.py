@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Dict, List, Mapping, Sequence, Tuple
 
@@ -36,12 +38,14 @@ from ..utils.paths import (
     infer_derivatives_root_from_steps,
     remap_path_tuple,
 )
+from ..utils.path_normalization import normalize_file_for_upload
 from .bids_validator import bids_validator_cli, find_bids_root_upwards
 from .data_providers import register_files_on_provider
 from .sftp import list_subdirs_and_files, sftp_connect_from_config
 from .userfiles import find_userfile_id_by_name_and_provider, update_userfile_group_and_move
 
 logger = logging.getLogger(__name__)
+
 
 # -----------------------------------------------------------------------------#
 # Public helpers                                                                #
@@ -61,6 +65,7 @@ def upload_bids_and_sftp_files(
     dry_run: bool = False,
     remote_root: str | None = None,
     path_map: Mapping[str, str] | None = None,
+    rewrite_absolute_paths: bool = False,
 ) -> None:
     """Synchronise part of a local BIDS tree with an SFTP provider.
 
@@ -86,18 +91,15 @@ def upload_bids_and_sftp_files(
             written. Defaults to the server root.
         path_map: Mapping of local trailing paths to remote replacements
             (e.g. ``{"anat": "ses-01/anat"}``).
+        rewrite_absolute_paths: When True, inspect text files before upload
+            and rewrite any embedded absolute paths into CBRAIN-friendly
+            relative paths (see :mod:`bids_cbrain_runner.utils.path_normalization`).
+            The original dataset on disk is left untouched; normalized copies
+            are written into a temporary staging directory.
         dry_run: When **True**, skip actual uploads and registration.
 
     Returns:
         None.  Progress and diagnostics are emitted via :pymod:`logging`.
-
-    Notes:
-        * Uploads **skip** files that already exist remotely (exact name match).
-        * Directory creation is idempotent; missing components are created
-          recursively, existing ones are left untouched.
-        * All network interactions use password authentication only (Paramiko).
-        * When ``dry_run`` is ``True`` no SFTP transfers or registration
-          requests are made. Planned actions are only logged.
     """
     # ------------------------------------------------------------------#
     # Early sanity checks                                                #
@@ -135,6 +137,8 @@ def upload_bids_and_sftp_files(
         "roots": {**pipeline_cfg.get("roots", {}), "derivatives_root": derivatives_root},
     }
 
+    dataset_root_path = Path(dataset_root).resolve()
+
     # Build the local path tree without falling back to recursive search when
     # a pattern component is missing. This avoids uploading unrelated folders
     # (e.g. ``func`` or ``fmap``) when a subject lacks the requested path
@@ -164,13 +168,32 @@ def upload_bids_and_sftp_files(
         return
 
     # Collect all potential registration targets
-    all_targets = []
+    all_targets: List[str] = []
     for pt in local_map.keys():
         if os.path.isfile(os.path.join(dataset_root, *pt)):
             all_targets.append("/".join(pt))
         elif pt:
             all_targets.append(pt[0])
     all_targets = sorted(set(all_targets))
+
+    # Optional temporary root for normalized copies.
+    temp_root: Path | None = None
+    if rewrite_absolute_paths and not dry_run:
+        temp_root = Path(
+            tempfile.mkdtemp(
+                prefix="cbrain-upload-normalized-",
+                dir=dataset_root_path.parent,
+            )
+        )
+        logger.info(
+            "[NORMALIZE] Staging normalized copies with rewritten internal paths under %s",
+            temp_root,
+        )
+    elif rewrite_absolute_paths and dry_run:
+        logger.info(
+            "[NORMALIZE] --upload-normalize-paths enabled (dry-run): "
+            "will not modify files on disk; only report which would be rewritten."
+        )
 
     # ------------------------------------------------------------------#
     # 3. Establish SFTP connection                                       #
@@ -204,7 +227,7 @@ def upload_bids_and_sftp_files(
                     # Summary key should be the file name itself.
                     top_folder = path_tuple[-1]
                 elif (
-                    path_tuple[: len(deriv_parts)] == list(deriv_parts)
+                    path_tuple[: len(deriv_parts)] == tuple(deriv_parts)
                     and len(path_tuple) > len(deriv_parts)
                 ):
                     # Skip the configured derivatives prefix to mimic non-derivative behaviour.
@@ -212,12 +235,55 @@ def upload_bids_and_sftp_files(
                 else:
                     top_folder = path_tuple[0]
             else:
+                # For pattern-only leaf steps (e.g. "*.fsf") the process still
+                # records the filename as the top-level "folder" in the summary
+                # later.
                 top_folder = None
-            local_subpath = (
-                dataset_root
-                if is_direct_file
-                else os.path.join(dataset_root, *path_tuple)
-            )
+
+            # ------------------------------------------------------------------
+            # Work out where the files actually live on disk for this entry.
+            #
+            # Cases:
+            #   * Direct single file at dataset root:
+            #       path_tuple = ("dataset_description.json",)
+            #       is_direct_file = True
+            #       → local_subpath = dataset_root
+            #
+            #   * Direct file in a deep directory:
+            #       path_tuple = ("derivatives","fsl","feat","fsf","file.fsf")
+            #       is_direct_file = True
+            #       → local_subpath = dataset_root / "derivatives/fsl/feat/fsf"
+            #
+            #   * Directory-style uploads:
+            #       path_tuple = ("sub-002","ses-01","func")
+            #       is_direct_file = False
+            #       → local_subpath = dataset_root / "sub-002/ses-01/func"
+            #
+            #   * Pattern-only leaf steps (e.g. "derivatives fsl feat fsf '*.fsf'"):
+            #       path_tuple = ()
+            #       local_files = ["file1.fsf", "file2.fsf", ...]
+            #       → local_subpath = dataset_root / "derivatives/fsl/feat/fsf"
+            # ------------------------------------------------------------------
+            if is_direct_file:
+                if path_tuple and len(path_tuple) > 1:
+                    # Drop the final component (the filename) to get the
+                    # directory where the file actually resides.
+                    local_subpath = os.path.join(dataset_root, *path_tuple[:-1])
+                else:
+                    # Single-file upload at the dataset root.
+                    local_subpath = dataset_root
+            else:
+                local_subpath = (
+                    os.path.join(dataset_root, *path_tuple) if path_tuple else dataset_root
+                )
+
+            # Special case: when local_map has an *empty* path_tuple but the
+            # last CLI step is a glob (e.g. "derivatives fsl feat fsf '*.fsf'"),
+            # the files physically live under dataset_root / steps[:-1], even
+            # though they are logically treated as flat userfiles on the
+            # provider.
+            if (not path_tuple) and steps and _looks_like_glob(steps[-1]):
+                local_subpath = os.path.join(dataset_root, *steps[:-1]) or dataset_root
 
             logger.info("[UPLOAD] Scanning local path: %s", local_subpath)
 
@@ -229,7 +295,7 @@ def upload_bids_and_sftp_files(
             # as a side effect.
             sftp_base = remote_root or initial_cwd
 
-            if not is_direct_file:
+            if not is_direct_file and path_tuple:
                 parent_remote = (
                     os.path.dirname(
                         build_remote_path(
@@ -242,7 +308,7 @@ def upload_bids_and_sftp_files(
                     or "/"
                 )
                 logger.info(
-                    "[UPLOAD] Uploading %s \u2192 %s", path_tuple[-1], parent_remote
+                    "[UPLOAD] Uploading %s → %s", path_tuple[-1], parent_remote
                 )
 
             # Build absolute remote path using the preserved base directory
@@ -253,6 +319,18 @@ def upload_bids_and_sftp_files(
                 sftp_base,
                 cfg=pipeline_cfg,
             )
+
+            # Decide how this subtree will appear on CBRAIN so that path
+            # normalisation can choose the appropriate "root" purely from
+            # the upload context.
+            if rewrite_absolute_paths:
+                norm_root_rel, norm_flatten = _compute_normalization_root(
+                    path_tuple,
+                    is_direct_file,
+                    deriv_parts,
+                )
+            else:
+                norm_root_rel, norm_flatten = None, False
 
             # Ensure the remote directory structure mirrors the local path.
             if not dry_run:
@@ -269,6 +347,7 @@ def upload_bids_and_sftp_files(
                 logger.debug(
                     "[DRY] Would ensure remote directories: %s", remote_full_path
                 )
+
             # List current remote contents.
             subdirs, existing_remote_files = list_subdirs_and_files(
                 sftp_client, remote_full_path
@@ -292,41 +371,63 @@ def upload_bids_and_sftp_files(
             # 3b. Upload missing files                                           #
             # ------------------------------------------------------------------#
             for fname in missing_on_remote:
+                # Local source path (original dataset)
+                source_path = Path(local_subpath) / fname
+
+                # Optionally create a normalized copy with rewritten internal paths.
+                upload_path = source_path
+                if rewrite_absolute_paths:
+                    upload_path = normalize_file_for_upload(
+                        upload_path,
+                        dataset_root_path,
+                        temp_root,
+                        pipeline_cfg,
+                        dry_run=dry_run,
+                        root_rel=norm_root_rel,
+                        flatten=norm_flatten,
+                    )
+
                 if is_direct_file:
-                    lpath = os.path.join(dataset_root, *path_tuple)
                     rpath = f"{remote_full_path.rstrip('/')}/{fname}"
                 else:
-                    lpath = os.path.join(local_subpath, fname)
-                    rpath = f"{remote_full_path}/{fname}"
+                    rpath = f"{remote_full_path.rstrip('/')}/{fname}"
 
                 if dry_run:
                     logger.info("[DRY] Would upload %s → %s", fname, rpath)
                 else:
                     logger.info("[UPLOAD] Uploading %s → %s", fname, rpath)
                     try:
-                        sftp_client.put(lpath, rpath)
+                        sftp_client.put(str(upload_path), rpath)
                     except Exception as exc:  # noqa: BLE001
                         logger.error("[UPLOAD] Failed to upload %s: %s", fname, exc)
                         continue
 
             if top_folder:
-                if is_direct_file:
-                    # Drop the configured derivatives prefix so single files
-                    # behave like non-derivative uploads.
-                    if (
-                        path_tuple[: len(deriv_parts)] == list(deriv_parts)
-                        and len(path_tuple) > len(deriv_parts)
-                    ):
-                        rel_path = "/".join(path_tuple[len(deriv_parts) :])
-                    else:
-                        rel_path = "/".join(path_tuple)
-                    newly_uploaded.setdefault(top_folder, []).append(rel_path)
+                # Preserve sub-directory context for single-file uploads so
+                # registration receives the full relative path (e.g.
+                # ``derivatives/license.txt`` instead of just ``license.txt``).
+                if is_direct_file and path_tuple and len(path_tuple) > 1:
+                    relative_missing = ["/".join((*path_tuple[:-1], f)) for f in missing_on_remote]
                 else:
-                    newly_uploaded.setdefault(top_folder, []).extend(missing_on_remote)
+                    relative_missing = list(missing_on_remote)
+
+                if is_direct_file or not path_tuple:
+                    # For single-file or pattern-only uploads, record just the
+                    # filename as the "relative path". This makes the summary
+                    # look like:
+                    #   "file.fsf": ["file.fsf"]
+                    newly_uploaded.setdefault(top_folder, []).extend(relative_missing)
+                else:
+                    # Directory-style uploads (e.g. sub-*/ses-*/anat):
+                    # keep listing the missing filenames under the top folder.
+                    newly_uploaded.setdefault(top_folder, []).extend(relative_missing)
+
     finally:
         # Always close the SFTP session to free network resources.
         sftp_client.close()
         ssh_client.close()
+        if temp_root is not None:
+            shutil.rmtree(temp_root, ignore_errors=True)
 
     # ------------------------------------------------------------------#
     # 4. Post-processing (optional registration & move)                 #
@@ -508,3 +609,54 @@ def ensure_remote_dir_structure(
 
     return created_any
 
+
+def _looks_like_glob(component: str) -> bool:
+    """Return True if a step contains common glob metacharacters."""
+    return any(ch in component for ch in "*?[")
+
+
+def _compute_normalization_root(
+    path_tuple: Tuple[str, ...],
+    is_direct_file: bool,
+    deriv_parts: Sequence[str],
+) -> tuple[Path | None, bool]:
+    """
+    Decide how embedded paths should be rewritten, purely from how this
+    subtree is uploaded to CBRAIN.
+
+    Returns (root_rel, flatten) where:
+
+      * root_rel: Path relative to the BIDS dataset root that represents
+                  the logical "root" of this userfile on CBRAIN.
+                  Examples:
+                    - Path("sub-002")   for subject-level trees
+                    - Path(".")        for dataset/derivatives trees
+                    - None             when flatten is True
+
+      * flatten:  When True, embedded paths are reduced to basenames
+                  (flat uploads, e.g. standalone .fsf files at the
+                  provider root).
+    """
+    # 1. Explicit single-file uploads: always flatten.
+    if is_direct_file:
+        return None, True
+
+    # 2. Root-level file matches (e.g. design.fsfs found at dataset root
+    #    via a pattern like "derivatives fsl feat fsf *.fsf") behave like
+    #    flat uploads on CBRAIN as well.
+    if not path_tuple:
+        return None, True
+
+    # 3. Under the configured derivatives root: treat dataset root as
+    #    the logical root for path rewriting.
+    if deriv_parts and path_tuple[: len(deriv_parts)] == tuple(deriv_parts):
+        return Path("."), False
+
+    # 4. Generic subject-style trees: userfile root is the first directory
+    #    component (keeps things BIDS-friendly without hard-coding "sub-").
+    first = path_tuple[0]
+    if first:
+        return Path(first), False
+
+    # 5. Fallback: dataset-root semantics for any other tree.
+    return Path("."), False

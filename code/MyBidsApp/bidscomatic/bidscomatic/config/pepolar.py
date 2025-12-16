@@ -8,7 +8,19 @@ Python pipeline is adopted.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Dict
+
+# Default mapping between BIDS ``dir-`` entity values and their opposites.
+# These defaults cover the common phase-encode pairs used by EPI sequences.
+_DEFAULT_DIR_PAIRS: Dict[str, str] = {
+    "AP": "PA",
+    "PA": "AP",
+    "LR": "RL",
+    "RL": "LR",
+    "SI": "IS",
+    "IS": "SI",
+}
 
 
 @dataclass(slots=True)
@@ -41,5 +53,10 @@ class PepolarConfig:
 
     geom_enforce: int = 1
     use_bids_uri: int = 0
+
+    # Mapping from `dir-<X>` label to its opposite (e.g., AP->PA, LR->RL).
+    # The pipeline uses this map to determine which `dir-` label should be
+    # derived when only one side of a PEPOLAR pair exists.
+    dir_pairs: Dict[str, str] = field(default_factory=lambda: dict(_DEFAULT_DIR_PAIRS))
 
     dry_run: bool = False

@@ -13,6 +13,7 @@ have been created.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Iterable, List, Optional
 
 from pydantic import BaseModel
 
@@ -87,3 +88,73 @@ class UnzipResult(BaseModel, frozen=True):
     # Additional metadata collected during v1.1+
     archives: list[Path] = []        # every *.zip / *.tar processed
     dcm_roots: list[Path] = []       # top-level DICOM dirs discovered
+
+
+def discover_subject_sessions(
+    root: Path,
+    *,
+    filter_sub: Iterable[str] | None = None,
+    filter_ses: Iterable[str] | None = None,
+) -> List[SubjectSession]:
+    """Discover subject/session combinations inside a BIDS dataset.
+
+    This helper provides the canonical behaviour expected by CLI commands:
+    * If *filter_sub* is omitted, all ``sub-*`` folders under *root* are used.
+    * If *filter_ses* is omitted:
+        - If a subject contains ``ses-*`` folders, each is emitted.
+        - Otherwise a session-less entry (``ses=None``) is emitted.
+    * If *filter_ses* is provided, the given sessions are paired with every
+      selected subject.
+
+    The helper accepts identifiers with or without ``sub-`` / ``ses-`` prefixes.
+
+    Args:
+        root: Dataset root directory.
+        filter_sub: Optional iterable of subject identifiers.
+        filter_ses: Optional iterable of session identifiers.
+
+    Returns:
+        A sorted list of :class:`SubjectSession` objects.
+    """
+
+    def _norm(value: str, prefix: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError(f"empty identifier for {prefix}")
+        return value if value.startswith(prefix) else f"{prefix}{value}"
+
+    if filter_sub:
+        subs = [_norm(s, "sub-") for s in filter_sub]
+    else:
+        subs = sorted(p.name for p in root.glob("sub-*") if p.is_dir())
+
+    sessions: list[SubjectSession] = []
+    for sub in subs:
+        sub_dir = root / sub
+        if not sub_dir.exists():
+            continue
+
+        if filter_ses:
+            sess = [_norm(se, "ses-") for se in filter_ses]
+            for ses in sess:
+                sessions.append(SubjectSession(root=root, sub=sub, ses=ses))
+            continue
+
+        ses_dirs = sorted(p.name for p in sub_dir.glob("ses-*") if p.is_dir())
+        if ses_dirs:
+            for ses in ses_dirs:
+                sessions.append(SubjectSession(root=root, sub=sub, ses=ses))
+        else:
+            sessions.append(SubjectSession(root=root, sub=sub, ses=None))
+
+    # De-duplicate while preserving stable order, then sort.
+    seen: set[tuple[str, Optional[str]]] = set()
+    uniq: list[SubjectSession] = []
+    for ss in sessions:
+        key = (ss.sub, ss.ses)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append(ss)
+
+    return sorted(uniq, key=lambda s: (s.sub, s.ses or ""))

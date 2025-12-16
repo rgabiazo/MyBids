@@ -1,4 +1,5 @@
-"""Organise functional BOLD NIfTIs into final BIDS ``func/`` folders.
+"""
+Organise functional BOLD NIfTIs into final BIDS ``func/`` folders.
 
 The module is intentionally pure: it only performs file discovery, selection,
 and movement. Heavy lifting such as DICOM → NIfTI conversion, BIDS validation,
@@ -13,6 +14,10 @@ Key behaviours
   so anatomical, diffusion, and functional logic stays identical.
 * REST NIfTIs are handled separately; deletion of the non-selected runs is
   optional through the *delete_losers* flag.
+* SBRef files (single-band reference) are handled explicitly:
+  - they are never considered BOLD candidates;
+  - the best SBRef (per dir bucket) is moved alongside the chosen BOLD as
+    ``*_sbref.nii.gz`` with matching entities.
 """
 
 from __future__ import annotations
@@ -41,6 +46,12 @@ from bidscomatic.config.schema import BIDSEntities, ConfigSchema, Sequence as YS
 from bidscomatic.models import BIDSPath
 from bidscomatic.pipelines.types import SubjectSession
 from bidscomatic.pipelines._selection import best_runs  # unified selection helper
+from bidscomatic.pipelines._meta import (
+    clear_meta_cache,
+    is_sbref_nifti,
+    task_name_of,
+    dir_label_of,
+)
 
 log = logging.getLogger(__name__)
 
@@ -50,16 +61,13 @@ log = logging.getLogger(__name__)
 # Patterns for extracting a numeric index from filenames. Ordered by how
 # specific they are; the first match wins.
 _IDX_PATTERNS = (
-    re.compile(r"_(?:AP|PA|LR|RL|SI)_(\d{2,})"),  # rfMRI_AP_17.nii.gz
-    re.compile(r"_i(\d{3,})"),                   # *_i0123.nii.gz
-    re.compile(r"[^\d](\d{2,})$"),              # *_15.nii.gz (trailing digits)
+    re.compile(r"_(?:AP|PA|LR|RL|SI)_(\d{2,})", re.I),  # rfMRI_AP_17.nii.gz
+    re.compile(r"_i(\d{3,})", re.I),  # *_i0123.nii.gz
+    re.compile(r"[^\d](\d{2,})$", re.I),  # *_15.nii.gz (trailing digits)
 )
 
 # Placeholder detection – used for stripping empty placeholders cleanly.
 _PLACEHOLDER_RE = re.compile(r"\{(?P<key>\w+)(?::[^\}]+)?\}")
-
-# Cheap cache so every JSON is read at most once per invocation.
-_TASK_CACHE: dict[Path, str | None] = {}
 
 # Default value for whether loser REST runs are removed from *sourcedata*.
 DELETE_LOSERS_DEFAULT = False
@@ -87,26 +95,10 @@ class Dest:
 # Low-level helpers (single-file scope)
 # ---------------------------------------------------------------------------
 
+
 def _task_of(path: Path) -> str | None:
-    """Return *task* label derived from the side-car JSON or *None*.
-
-    The helper caches results in :pydata:`_TASK_CACHE` to avoid repeated disk
-    access when the same JSON is inspected multiple times.
-
-    Args:
-        path: Path to the ``*.nii.gz`` file.
-
-    Returns:
-        The lower-cased value of *TaskName* or *None* when missing/invalid.
-    """
-    if path not in _TASK_CACHE:
-        try:
-            meta = json.loads(path.with_suffix("").with_suffix(".json").read_text())
-            task_val = meta.get("TaskName")
-            _TASK_CACHE[path] = task_val.strip().lower() if isinstance(task_val, str) and task_val.strip() else None
-        except Exception:
-            _TASK_CACHE[path] = None
-    return _TASK_CACHE[path]
+    """Return *task* label derived from the side-car JSON or *None*."""
+    return task_name_of(path)
 
 
 def _n_vols(p: Path) -> int:
@@ -130,24 +122,35 @@ def _filename_index(p: Path) -> int | None:
 
 def _pick_runs(paths: Sequence[Path]) -> list[Path]:
     """Return *paths* deterministically sorted for run enumeration."""
-    # The stable key uses the numeric index when available; falls back to mtime.
-    return sorted(paths, key=lambda p: (_filename_index(p) or 9_999_999, p.stat().st_mtime))
+    return sorted(
+        paths, key=lambda p: (_filename_index(p) or 9_999_999, p.stat().st_mtime)
+    )
+
+
+def _dir_token(p: Path) -> str | None:
+    """Infer PE direction label for *p*.
+
+    Preference:
+      1) filename (dir-AP, _AP_, etc.)
+      2) JSON PhaseEncodingDirection -> dir label (RAS assumption)
+    """
+    return dir_label_of(p)
 
 
 # ---------------------------------------------------------------------------
 # Entity-rendering helpers
 # ---------------------------------------------------------------------------
 
+
 def _strip_pref(text: str, pref: str) -> str:
     """Remove *pref* from *text* if present (case-sensitive)."""
-    return text[len(pref):] if isinstance(text, str) and text.startswith(pref) else text
+    return text[len(pref) :] if isinstance(text, str) and text.startswith(pref) else text
 
 
 def _remove_unused_placeholders(tmpl: str, tokens: Dict[str, Any]) -> str:
     """Remove placeholders whose corresponding token is empty or *None*."""
 
-    def repl(match: re.Match[str]) -> str:  # noqa: D401 – small inner helper
-        """Return an empty string when *match* maps to a blank token."""
+    def repl(match: re.Match[str]) -> str:
         key = match.group("key")
         return "" if tokens.get(key) in {"", None} else match.group(0)
 
@@ -155,36 +158,22 @@ def _remove_unused_placeholders(tmpl: str, tokens: Dict[str, Any]) -> str:
 
 
 def _render_entities(tmpl: BIDSEntities, **tokens) -> BIDSEntities:
-    """Render a :class:`~bidscomatic.config.schema.BIDSEntities` template.
-
-    Args:
-        tmpl: The template directly from *series.yaml* which may include
-            placeholders such as ``{run}`` or ``{dir}``.
-        **tokens: Concrete substitutions (``run=1`` etc.).
-
-    Returns:
-        A new :class:`~bidscomatic.config.schema.BIDSEntities` instance with
-        all placeholders resolved where possible.
-    """
-    # 1. Normalise tokens so duplicate prefixes never occur (sub-sub-001 …).
+    """Render a :class:`~bidscomatic.config.schema.BIDSEntities` template."""
     clean: Dict[str, Any] = {
-        k: _strip_pref(v, f"{k}-") if isinstance(v, str) else v for k, v in tokens.items()
+        k: _strip_pref(v, f"{k}-") if isinstance(v, str) else v
+        for k, v in tokens.items()
     }
 
     rendered: Dict[str, Any] = {}
     for field, raw in tmpl.model_dump().items():
         if not isinstance(raw, str):
-            # Non-string entities are copied verbatim (usually *None*).
             rendered[field] = raw
             continue
 
         safe_tmpl = _remove_unused_placeholders(raw, clean)
-
-        # ``str.format`` would raise KeyError when placeholder remains unresolved.
         try:
             rendered[field] = safe_tmpl.format(**clean)
         except (ValueError, KeyError):
-            # Gracefully keep the unresolved placeholder unchanged.
             bare = _PLACEHOLDER_RE.sub(lambda m: "{" + m.group("key") + "}", safe_tmpl)
             rendered[field] = bare.format(**clean)
 
@@ -200,7 +189,6 @@ def _ensure_taskname(json_path: Path, task: str) -> None:
         try:
             meta = json.loads(json_path.read_text())
         except Exception:
-            # Corrupted JSON is silently ignored; a fresh one is written.
             meta = {}
 
     meta["TaskName"] = task
@@ -219,8 +207,83 @@ def _move_or_skip(src: Path, dst: Path, *, overwrite: bool) -> None:
 
 
 # ---------------------------------------------------------------------------
+# SBRef helpers
+# ---------------------------------------------------------------------------
+
+
+def _collect_sbref_candidates(ss: SubjectSession, seq: YSeq, src_root: Path) -> List[Path]:
+    """Return SBRef candidates for *ss* matching the parent functional *seq*."""
+    subj_dir = src_root / ss.sub / (ss.ses or "")
+    cands = sorted(subj_dir.rglob(f"{seq.sequence_id}*.nii.gz"))
+    return [p for p in cands if is_sbref_nifti(p)]
+
+
+def _pair_sbref_for_bold(sbrefs: Sequence[Path], bold: Path) -> Path | None:
+    """Pick the most likely SBRef to pair with a specific BOLD run.
+
+    Robustness:
+      * ignores SBRef paths that no longer exist (e.g. already moved)
+      * avoids crashing when indices are absent/unparseable
+      * guards stat() for rare race conditions
+    """
+    # Filter out stale paths (important for multi-run pairing where SBRefs get moved)
+    live = [p for p in sbrefs if p.exists()]
+    if not live:
+        return None
+
+    b_idx = _filename_index(bold)
+
+    def key(p: Path) -> tuple[int, int, float]:
+        # Prefer same numeric index, then closest index, then newest mtime.
+        p_idx = _filename_index(p)
+
+        if b_idx is None:
+            same = 0
+            dist = 0
+        else:
+            same = 1 if (p_idx is not None and p_idx == b_idx) else 0
+            dist = abs((p_idx or 9_999_999) - b_idx)
+
+        try:
+            mtime = p.stat().st_mtime
+        except FileNotFoundError:
+            # Should be rare; treat as very old so it loses tie-breaks.
+            mtime = 0.0
+
+        return (same, -dist, mtime)
+
+    return max(live, key=key, default=None)
+
+
+def _sbref_target_paths(dst_bold_nii: Path) -> tuple[Path, Path]:
+    """Compute destination SBRef NIfTI and JSON paths from a BOLD destination."""
+    dst_sbref_nii = dst_bold_nii.with_name(
+        dst_bold_nii.name.replace("_bold.nii.gz", "_sbref.nii.gz")
+    )
+    dst_sbref_json = dst_sbref_nii.with_suffix("").with_suffix(".json")
+    return dst_sbref_nii, dst_sbref_json
+
+
+def _move_sbref_pair(sbref: Path, dst_bold_nii: Path, *, overwrite: bool, task_name: str) -> None:
+    """Move SBRef NIfTI+JSON to sit alongside the moved BOLD."""
+    dst_sbref_nii, dst_sbref_json = _sbref_target_paths(dst_bold_nii)
+
+    _move_or_skip(sbref, dst_sbref_nii, overwrite=overwrite)
+
+    sbref_json = sbref.with_suffix("").with_suffix(".json")
+    if sbref_json.exists():
+        _move_or_skip(sbref_json, dst_sbref_json, overwrite=overwrite)
+    else:
+        dst_sbref_json.parent.mkdir(parents=True, exist_ok=True)
+        dst_sbref_json.touch(exist_ok=True)
+
+    _ensure_taskname(dst_sbref_json, task_name)
+
+
+# ---------------------------------------------------------------------------
 # Directory-level helpers
 # ---------------------------------------------------------------------------
+
 
 def _best_subset(paths: list[Path], wanted: int | None) -> list[Path]:
     """Return the best subset of *paths* according to *wanted* volume filter."""
@@ -238,12 +301,20 @@ def _process_dir(
     overwrite: bool,
     vol_filter: Mapping[str, int],
 ) -> None:
-    """Handle one subject/session/dir-bucket by moving the chosen runs.
+    """Handle one subject/session/dir-bucket by moving the chosen runs."""
+    # Filter out SBRef from BOLD selection
+    bold_candidates = [p for p in group if not is_sbref_nifti(p)]
+    if not bold_candidates:
+        log.info(
+            "[%s %s] %s dir=%s → no BOLD candidates (only SBRef?)",
+            ss.sub,
+            ss.ses or "",
+            task_name,
+            dir_token or "<none>",
+        )
+        return
 
-    The function is intentionally chatty: INFO-level breadcrumbs trace the
-    selection process so debugging large datasets stays feasible.
-    """
-    chosen = _best_subset(group, vol_filter.get(task_name))
+    chosen = _best_subset(bold_candidates, vol_filter.get(task_name))
     if not chosen:
         log.info(
             "[%s %s] %s dir=%s → nothing matched volume filter",
@@ -256,6 +327,9 @@ def _process_dir(
 
     # The *run* entity is only added when multiple runs survive the filter.
     add_run_entity = len(chosen) > 1
+
+    # Pre-collect SBRef candidates once per bucket
+    sbref_cands = [p for p in group if is_sbref_nifti(p)]
 
     dests: list[Dest] = []
     for run_idx, src in enumerate(_pick_runs(chosen), start=1):
@@ -301,28 +375,26 @@ def _process_dir(
 
         _ensure_taskname(d.dst_json, task_name)
 
+        # Pair and move SBRef, if available.
+        # IMPORTANT: consume SBRef candidates so we don't reuse stale paths.
+        sbref = _pair_sbref_for_bold(sbref_cands, d.src_nii)
+        if sbref:
+            _move_sbref_pair(sbref, d.dst_nii, overwrite=overwrite, task_name=task_name)
+            # Remove from pool so it cannot be reused for later runs (and cannot crash via stale paths).
+            sbref_cands = [p for p in sbref_cands if p != sbref]
+
 
 # ---------------------------------------------------------------------------
 # REST-specific helpers
 # ---------------------------------------------------------------------------
 
+
 def _collect_rest_candidates(ss: SubjectSession, rest_seq: YSeq, src_root: Path) -> List[Path]:
-    """Return every resting-state NIfTI for *ss* matching *rest_seq*."""
     subj_dir = src_root / ss.sub / (ss.ses or "")
     return sorted(subj_dir.rglob(f"{rest_seq.sequence_id}_*.nii.gz"))
 
 
-def _dir_token_of(fname: str) -> str | None:
-    """Infer PE direction token from *fname* (AP/PA) or *None*."""
-    if "_AP_" in fname:
-        return "AP"
-    if "_PA_" in fname:
-        return "PA"
-    return None
-
-
 def _cleanup_losers(losers: Iterable[Path]) -> None:
-    """Delete loser files and their JSONs; silence errors."""
     for lf in losers:
         try:
             jf = lf.with_suffix("").with_suffix(".json")
@@ -344,14 +416,19 @@ def _process_rest(
     vol_filter: Mapping[str, int],
     delete_losers: bool,
 ) -> None:
-    """Handle resting-state files for one subject/session."""
     candidates = _collect_rest_candidates(ss, rest_seq, src_root)
     if not candidates:
         log.info("No resting-state NIfTIs for %s %s", ss.sub, ss.ses or "")
         return
 
-    best = max(candidates, key=_rank_nifti)
-    dir_tok = _dir_token_of(best.name)
+    # Winner selection should ignore SBRef
+    bold_candidates = [p for p in candidates if not is_sbref_nifti(p)]
+    if not bold_candidates:
+        log.info("[%s %s] rest – only SBRef candidates found; skipping", ss.sub, ss.ses or "")
+        return
+
+    best = max(bold_candidates, key=_rank_nifti)
+    dir_tok = _dir_token(best)
 
     log.info(
         "[%s %s] rest – selected %s (%d vols) as winning run",
@@ -361,9 +438,12 @@ def _process_rest(
         _n_vols(best),
     )
 
-    # 1) Move the winner into BIDS.
+    # FIX: previously referenced an undefined helper `_dir_token_from_name`.
+    # Use `_dir_token(Path)` which is already defined and supports JSON fallback.
+    bucket = [p for p in candidates if _dir_token(p) == dir_tok] if dir_tok else candidates
+
     _process_dir(
-        [best],
+        bucket,
         dir_token=dir_tok,
         task_name="rest",
         seq=rest_seq,
@@ -373,7 +453,6 @@ def _process_rest(
         vol_filter=vol_filter,
     )
 
-    # 2) Optionally delete losers.
     if delete_losers:
         losers = [p for p in candidates if p != best]
         if losers:
@@ -390,6 +469,7 @@ def _process_rest(
 # Subject/session dispatcher (task + rest)
 # ---------------------------------------------------------------------------
 
+
 def _process_subject_session(
     ss: SubjectSession,
     *,
@@ -403,14 +483,12 @@ def _process_subject_session(
     vol_filter: Mapping[str, int],
     delete_losers: bool,
 ) -> None:
-    """Entry-point for processing one *SubjectSession*."""
     task_candidates = sorted(
         (src_root / ss.sub / (ss.ses or "")).rglob(f"{task_seq.sequence_id}*.nii.gz")
     )
 
     have_task_files = bool(task_candidates)
     if not have_task_files:
-        # Decide whether skipping is fatal or expected.
         if include_rest and not tasks:
             log.info(
                 "No task fMRI NIfTIs for %s %s – continuing with REST-only flow",
@@ -419,21 +497,18 @@ def _process_subject_session(
             )
         elif tasks:
             log.error("No functional NIfTIs found for %s %s (task search)", ss.sub, ss.ses or "")
-        # Prepare empty buckets so REST can still run.
         buckets: DefaultDict[str | None, list[Path]] = defaultdict(list)
     else:
-        # Group task files by TaskName (None = unlabeled).
         buckets = defaultdict(list)
         for p in task_candidates:
+            # SBRef still participates in grouping by task; we filter later.
             buckets[_task_of(p)].append(p)
 
-    # --------------------------- task runs --------------------------------
     if tasks:
         for task_name in tasks:
             key = None if task_name == "task" else task_name.lower()
             paths_for_task = buckets.get(key, [])
 
-            # Tolerate unlabeled runs when exactly one task requested.
             if (
                 not paths_for_task
                 and key is not None
@@ -448,7 +523,7 @@ def _process_subject_session(
                     len(paths_for_task),
                     task_name,
                 )
-                buckets[None] = []  # prevent duplicate processing later
+                buckets[None] = []
 
             _process_task(
                 task_name=task_name,
@@ -460,7 +535,6 @@ def _process_subject_session(
                 vol_filter=vol_filter,
             )
 
-    # --------------------------- REST runs --------------------------------
     if include_rest:
         _process_rest(
             ss,
@@ -472,8 +546,8 @@ def _process_subject_session(
             delete_losers=delete_losers,
         )
 
-    # Reset JSON cache for next subject/session.
-    _TASK_CACHE.clear()
+    # Clear JSON cache between subject/sessions
+    clear_meta_cache()
 
 
 def _process_task(
@@ -486,20 +560,22 @@ def _process_task(
     overwrite: bool,
     vol_filter: Mapping[str, int],
 ) -> None:
-    """Process one *task* (e.g. *nback*) for a specific subject/session."""
-    # Bucket paths by PE direction so *best_runs()* is applied per bucket.
-    dir_buckets: Dict[str | None, list[Path]] = {d.value: [] for d in PhaseDir}
-    dir_buckets[None] = []
+    from collections import defaultdict
+
+    dir_buckets: DefaultDict[str | None, list[Path]] = defaultdict(list)
 
     for p in paths:
-        if "_AP_" in p.name:
-            dir_buckets[PhaseDir.AP.value].append(p)
-        elif "_PA_" in p.name:
-            dir_buckets[PhaseDir.PA.value].append(p)
-        else:
-            dir_buckets[None].append(p)
+        dir_buckets[_dir_token(p)].append(p)
 
-    for dir_token, bucket in dir_buckets.items():
+    # Stable ordering: common directions first, None last, unknown labels alphabetical.
+    order = {"AP": 0, "PA": 1, "LR": 2, "RL": 3, "SI": 4, "IS": 5}
+
+    def _key(tok: str | None) -> tuple[int, str]:
+        if tok is None:
+            return (99, "")
+        return (order.get(tok, 50), tok)
+
+    for dir_token, bucket in sorted(dir_buckets.items(), key=lambda kv: _key(kv[0])):
         if bucket:
             _process_dir(
                 bucket,
@@ -514,8 +590,9 @@ def _process_task(
 
 
 # ---------------------------------------------------------------------------
-# Public entry-point (called by CLI and tests)
+# Public entry-point
 # ---------------------------------------------------------------------------
+
 
 def bidsify_functional(
     *,
@@ -528,20 +605,6 @@ def bidsify_functional(
     vol_filter: Mapping[str, int] | None = None,
     delete_losers: bool = DELETE_LOSERS_DEFAULT,
 ) -> None:
-    """Organise functional NIfTIs into their BIDS *func/* folders.
-
-    Args:
-        dataset_root: Path to the dataset root containing ``dataset_description.json``.
-        sessions: Iterable of :class:`~bidscomatic.pipelines.types.SubjectSession`.
-        cfg: Parsed *series.yaml* configuration.
-        overwrite: Replace existing files when *True*.
-        tasks: Explicit task names (e.g. ``["nback", "stroop"]``). ``None``
-            means *task* sub-flag was omitted.
-        include_rest: Process resting-state runs as well.
-        vol_filter: Optional mapping *task → expected volume count*.
-        delete_losers: When *True*, delete non-selected REST runs from
-            *sourcedata* (legacy behaviour).
-    """
     tasks = tasks or []
     vol_filter = vol_filter or {}
 

@@ -1,6 +1,9 @@
 import sys
 import types
 
+import sys
+import types
+import importlib
 import pytest
 
 
@@ -14,7 +17,10 @@ def _import_cli_with_stubs():
     stub.CbrainTaskError = Exception
     sys.modules['bids_cbrain_runner.api.client_openapi'] = stub
 
-    from bids_cbrain_runner import cli as cli_mod
+    # Force a fresh import so the stubbed module is used even if the CLI was
+    # previously imported by another test.
+    sys.modules.pop('bids_cbrain_runner.cli', None)
+    cli_mod = importlib.import_module('bids_cbrain_runner.cli')
     return cli_mod
 
 

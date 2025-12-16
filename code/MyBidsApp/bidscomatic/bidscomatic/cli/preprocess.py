@@ -8,14 +8,14 @@ available; the command now also provides a wrapper for fMRIPost-AROMA.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Tuple
+from typing import Dict, Tuple
 
 import json
 import click
 import structlog
 
 from bidscomatic.config.pepolar import PepolarConfig
-from bidscomatic.pipelines.types import SubjectSession
+from bidscomatic.pipelines.types import SubjectSession, discover_subject_sessions
 from bidscomatic.pipelines.pepolar import derive_pepolar_fieldmaps
 from bidscomatic.utils.filters import split_commas
 from bidscomatic.config.tools import (
@@ -36,6 +36,45 @@ from bidscomatic.engines.docker import DockerEngine
 from bidscomatic.utils.resources import tune_resources, format_resource_summary
 
 log = structlog.get_logger()
+
+
+def _parse_dir_pairs(pairs: Tuple[str, ...]) -> Dict[str, str]:
+    """Parse ``--dir-pair`` CLI values into a symmetric mapping.
+
+    Accepted separators: ``=``, ``:``, ``/`` (e.g., ``AP=PA``).
+
+    The returned dict always includes both directions (e.g., AP->PA and PA->AP).
+
+    Args:
+        pairs: Tuple of raw strings supplied by Click.
+
+    Returns:
+        Mapping suitable for :class:`~bidscomatic.config.pepolar.PepolarConfig`.
+    """
+    mapping: Dict[str, str] = {}
+    for raw in pairs:
+        token = (raw or "").strip()
+        if not token:
+            continue
+
+        for sep in ("=", ":", "/"):
+            if sep in token:
+                left, right = (p.strip() for p in token.split(sep, 1))
+                break
+        else:
+            raise click.ClickException(
+                f"Invalid --dir-pair '{raw}'. Expected 'A=B' (e.g., 'AP=PA')."
+            )
+
+        if not left or not right:
+            raise click.ClickException(
+                f"Invalid --dir-pair '{raw}'. Both sides must be non-empty."
+            )
+
+        mapping[left] = right
+        mapping[right] = left
+
+    return mapping
 
 
 @click.group(name="preprocess")
@@ -66,6 +105,16 @@ def preprocess_group() -> None:
 @click.option("--bet-f", type=float, default=0.30)
 @click.option("--geom-enforce", type=int, default=1)
 @click.option("--use-bids-uri", type=int, default=0)
+@click.option(
+    "--dir-pair",
+    "dir_pairs",
+    multiple=True,
+    callback=split_commas,
+    metavar="A=B",
+    help="Declare opposite direction labels for the BIDS dir- entity "
+         "(e.g., 'AP=PA', 'LR=RL'). Can be repeated or comma-separated. "
+         "If omitted, defaults support AP/PA, LR/RL, SI/IS.",
+)
 @click.option("--dry-run", is_flag=True, help="Perform a trial run without writing files.")
 @click.pass_obj
 def pepolar(
@@ -92,22 +141,23 @@ def pepolar(
     bet_f: float,
     geom_enforce: int,
     use_bids_uri: int,
+    dir_pairs: Tuple[str, ...],
     dry_run: bool,
 ) -> None:
     """Derive opposite phase-encoding fieldmaps (PEPOLAR)."""
     root: Path = ctx_obj["root"]
-    subs = filter_sub or sorted(
-        p.name.removeprefix("sub-") for p in root.glob("sub-*")
+
+    sessions = discover_subject_sessions(
+        root,
+        filter_sub=filter_sub or None,
+        filter_ses=filter_ses or None,
     )
-    sess = filter_ses or [None]
+    if not sessions:
+        raise click.ClickException(
+            f"No matching subject/session folders found under {root}"
+        )
 
-    sessions = [
-        SubjectSession(root=root, sub=f"sub-{s}", ses=(f"ses-{se}" if se else None))
-        for s in subs
-        for se in sess
-    ]
-
-    cfg = PepolarConfig(
+    cfg_kwargs = dict(
         split_rule=pepolar_split_rule,
         mad_k=mad_k,
         iqr_k=iqr_k,
@@ -129,6 +179,11 @@ def pepolar(
         use_bids_uri=use_bids_uri,
         dry_run=dry_run,
     )
+
+    if dir_pairs:
+        cfg_kwargs["dir_pairs"] = _parse_dir_pairs(dir_pairs)
+
+    cfg = PepolarConfig(**cfg_kwargs)
 
     paths = derive_pepolar_fieldmaps(root, sessions, cfg, tasks=tasks)
     if not paths:

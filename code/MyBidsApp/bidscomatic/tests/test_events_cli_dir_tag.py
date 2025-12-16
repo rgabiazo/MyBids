@@ -1,7 +1,7 @@
 from pathlib import Path
 import os
-import os
 import subprocess
+
 import pandas as pd
 
 
@@ -27,7 +27,11 @@ def _make_sheet(path: Path) -> None:
 
 
 def test_dir_inferred_from_json(tmp_path: Path) -> None:
-    """Verify DIR inferred from JSON behavior."""
+    """Verify DIR inferred from JSON behavior.
+
+    For RAS-oriented NIfTI:
+      PhaseEncodingDirection "j-" => A->P => dir-AP
+    """
     ds = tmp_path / "ds"
     ds.mkdir()
     (ds / "dataset_description.json").write_text("{}")
@@ -72,7 +76,7 @@ def test_dir_inferred_from_json(tmp_path: Path) -> None:
         env=env,
     )
 
-    out = ds / "sub-001" / "func" / "sub-001_task-demo_dir-PA_run-01_events.tsv"
+    out = ds / "sub-001" / "func" / "sub-001_task-demo_dir-AP_run-01_events.tsv"
     assert out.exists()
 
 
@@ -120,4 +124,3 @@ def test_dir_from_filename_fallback(tmp_path: Path) -> None:
 
     out = ds / "sub-002" / "func" / "sub-002_task-demo_dir-AP_run-01_events.tsv"
     assert out.exists()
-

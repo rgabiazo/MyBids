@@ -293,30 +293,96 @@ Example output (abridged):
 
 ### BIDS Conversion
 
-Promote NIfTIs into the canonical `anat/`, `func/`, `dwi/` and `fmap/` hierarchy with on‑the‑fly entity detection.
+`bidscomatic-cli bids` promotes converted NIfTI (+ sidecar) files under `sourcedata/nifti/` into the canonical BIDS hierarchy:
+
+- `sub-*/[ses-*/]anat/` (anatomical)
+- `sub-*/[ses-*/]func/` (functional BOLD + SBRef)
+- `sub-*/[ses-*/]dwi/`  (diffusion)
+- `sub-*/[ses-*/]fmap/` (EPI fieldmaps)
+
+It performs on-the-fly entity detection (e.g., `dir-AP`/`dir-PA`) and injects/repairs key metadata (notably `TaskName` for functional runs). Re-running the command is safe: by default it **skips** files that already exist in the BIDS tree unless `--overwrite` is used.
+
+#### Flags
 
 | Flag | Description |
 | --- | --- |
-| `--anat <series[,series…]>` | Declare anatomical series (e.g., `t1w,t2w`) to promote into `anat/`. |
-| `--func <task=labels[,task=labels…]>` | Map functional runs to task labels (e.g., `task=nback,rest`). |
+| `--anat <subtype[,subtype…]>` | Promote anatomical series into `anat/` (e.g., `t1w`, `t2w`). |
+| `--func <spec[,spec…]>` | Promote functional series into `func/`. Specs support: `task=<name>[@<vols>]`, `rest[@<vols>]`, or `task` (all tasks). Example: `--func task=assocmemory,rest` or `--func task=assocmemory@200,rest@780`. |
 | `--dwi` | Include diffusion-weighted series during BIDS promotion. |
-| `--epi` | Include EPI fieldmaps during BIDS promotion. |
+| `--epi` | Include EPI fieldmaps during BIDS promotion (creates/organises `*_dir-<X>_epi.*` under `fmap/`). |
+| `--intended-rel` | **With `--epi`**: write `fmap/*_epi.json` `IntendedFor` entries as **subject-relative** paths (e.g., `ses-01/func/...`) and harmonize `TotalReadoutTime` when it is consistent across intended targets. |
+| `--filter-sub <id[,id…]>` | Only process selected subjects (IDs with or without the `sub-` prefix; repeatable or comma-separated). |
+| `--filter-ses <id[,id…]>` | Only process selected sessions (IDs with or without the `ses-` prefix; repeatable or comma-separated). |
 | `--overwrite` | Replace existing BIDS outputs when regenerating files. |
 
+#### Common usage
+
+Promote T1w + a task + rest + EPI fieldmaps for **all** subjects/sessions:
+
 ```bash
-bidscomatic-cli bids sourcedata/nifti --anat t1w --func task=memory,rest --epi
+bidscomatic-cli -v bids sourcedata/nifti \
+  --anat t1w \
+  --func task=assocmemory,rest \
+  --epi \
+  --intended-rel
 ```
 
-Example output (abridged):
+Promote **one** subject/session (useful for debugging):
+
+```bash
+bidscomatic-cli -v bids sourcedata/nifti \
+  --anat t1w \
+  --func task=assocmemory,rest \
+  --epi \
+  --intended-rel \
+  --filter-sub 009 \
+  --filter-ses 01
+```
+
+Apply **volume-count filters** (only keep runs matching the requested volume count; otherwise falls back to the “best run” heuristic):
+
+```bash
+bidscomatic-cli -v bids sourcedata/nifti \
+  --func task=assocmemory@200,rest@780 \
+  --epi \
+  --intended-rel
+```
+
+Refresh **fieldmap metadata only** (no functional/anat moves; useful after you’ve already moved everything into BIDS):
+
+```bash
+bidscomatic-cli -v bids sourcedata/nifti \
+  --epi \
+  --intended-rel
+```
+
+#### Example output (abridged)
 
 ```text
+(.venv) YourName@Mac YourBidsProject % bidscomatic-cli -v bids sourcedata/nifti \
+  --anat t1w \
+  --func task=assocmemory,rest \
+  --epi \
+  --intended-rel \
+  --filter-sub 009 \
+  --filter-ses 01
+  
 === Organise BIDS ===
-[INFO] Picked T1w.nii.gz → sub-001/ses-01/anat/sub-001_ses-01_T1w.nii.gz
-[INFO] rfMRI_TASK_AP_16.nii.gz → sub-001/ses-01/func/sub-001_ses-01_task-memory_dir-AP_run-01_bold.nii.gz
-[INFO] rfMRI_REST_AP_25.nii.gz → sub-001/ses-01/func/sub-001_ses-01_task-rest_dir-AP_bold.nii.gz
-[INFO] rfMRI_PA_29.nii.gz → sub-001/ses-01/fmap/sub-001_ses-01_dir-PA_epi.nii.gz
-✓ BIDS organisation complete.
+  • sub-009/ses-01
+[INFO] Picked T1w_mprage_800iso_vNav_11.nii.gz → sub-009/ses-01/anat/sub-009_ses-01_T1w.nii.gz
+[INFO] assocmemory dir=AP → 3 run(s) to move, 0 already present
+[INFO] .../rfMRI_TASK_AP_13.nii.gz → sub-009/ses-01/func/sub-009_ses-01_task-assocmemory_dir-AP_run-01_bold.nii.gz
+[INFO] .../rfMRI_TASK_AP_12.nii.gz → sub-009/ses-01/func/sub-009_ses-01_task-assocmemory_dir-AP_run-01_sbref.nii.gz
+[INFO] rest – selected rfMRI_REST_AP_22.nii.gz (780 vols) as winning run
+[INFO] .../rfMRI_REST_AP_22.nii.gz → sub-009/ses-01/func/sub-009_ses-01_task-rest_dir-AP_bold.nii.gz
+[INFO] .../rfMRI_PA_26.nii.gz → sub-009/ses-01/fmap/sub-009_ses-01_dir-PA_epi.nii.gz
+[INFO] updated IntendedFor (8 target(s)) in sub-009/ses-01/fmap/sub-009_ses-01_dir-PA_epi.json
+✓ Anatomical organisation complete.
+✓ Functional organisation complete.
+✓ EPI field-map organisation complete.
 ```
+
+**Tip:** If you re-run `bidscomatic-cli bids` after the first promotion, the raw NIfTIs will have been moved out of `sourcedata/nifti/`. In that case you’ll typically see “exists – skipped” messages, and you should only add `--overwrite` if you truly want to regenerate outputs.
 
 ### Generating `events.tsv`
 

@@ -200,6 +200,15 @@ def _parse_func_specs(specs: tuple[str, ...]) -> tuple[list[str], bool, Dict[str
     show_default=True,
     help="Populate missing opposite-phase *epi* field-maps.",
 )
+@click.option(
+    "--intended-rel",
+    is_flag=True,
+    help=(
+        "When used with --epi: update fmap/*_epi.json IntendedFor using paths "
+        "relative to the subject directory (e.g. 'ses-01/func/...') and "
+        "harmonize TotalReadoutTime when consistent across intended targets."
+    ),
+)
 # --------------- subject  filters ---------------
 @click.option(
     "--filter-sub",
@@ -233,6 +242,7 @@ def cli(  # type: ignore[override]
     func_specs: Tuple[str, ...],
     dwi: bool,
     epi: bool,
+    intended_rel: bool,
     overwrite: bool,
     filter_sub: Tuple[str, ...],
     filter_ses: Tuple[str, ...],
@@ -251,6 +261,8 @@ def cli(  # type: ignore[override]
         func_specs: Functional specifications parsed from ``--func``.
         dwi: When *True* run the diffusion pipeline.
         epi: When *True* generate missing field‑maps.
+        intended_rel: When *True* (and epi is enabled), update fieldmap JSON
+            IntendedFor entries using subject-relative paths and harmonize TRT.
         overwrite: Replace existing files when set.
         filter_sub: Subject filter values.
         filter_ses: Session filter values.
@@ -273,6 +285,10 @@ def cli(  # type: ignore[override]
 
     echo_banner("Organise BIDS")
 
+    # Warn if user supplied intended-rel without epi ------------------------
+    if intended_rel and not epi:
+        log.warning("[bids] --intended-rel has no effect without --epi")
+
     # Validate all provided paths -------------------------------------------
     good, bad = [], []
     for raw in paths:
@@ -280,8 +296,13 @@ def cli(  # type: ignore[override]
         if p.exists():
             good.append(p)
         else:
-            close = difflib.get_close_matches(p.name, [c.name for c in p.parent.glob("*")], n=1)
-            bad.append(f"{p}" + (f" (did you mean {p.parent/close[0]}?)" if close else ""))
+            close = difflib.get_close_matches(
+                p.name, [c.name for c in p.parent.glob("*")], n=1
+            )
+            bad.append(
+                f"{p}"
+                + (f" (did you mean {p.parent/close[0]}?)" if close else "")
+            )
     if bad:
         raise click.ClickException("These PATHS do not exist:\n  " + "\n  ".join(bad))
 
@@ -375,5 +396,6 @@ def cli(  # type: ignore[override]
             sessions=sessions,
             cfg=cfg,
             overwrite=overwrite,
+            intended_rel=intended_rel,
         )
         echo_success("EPI field-map organisation complete.")

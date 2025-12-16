@@ -125,6 +125,18 @@ def test_cli_preprocess_creates(tmp_path):
     assert len(meta.get('IntendedFor', [])) == 2
 
 
+def test_cli_preprocess_auto_discovers_sessions(tmp_path):
+    """If --filter-ses is omitted, CLI should auto-discover ses-* folders."""
+    _make_dataset(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli_main,
+        ["--bids-root", str(tmp_path), "preprocess", "pepolar", "--filter-sub", "001"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Session: ses-01" in result.output
+
+
 def test_cli_preprocess_task_filter(tmp_path):
     """Verify CLI preprocess task filter behavior."""
     _make_dataset(tmp_path)

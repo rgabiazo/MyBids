@@ -476,15 +476,17 @@ def make_events_frames(  # noqa: C901 – data‑munging is inherently busy
 # ════════════════════════════════════════════════════════════════════════════
 
 # Mapping PhaseEncodingDirection values to BIDS ``dir-`` tags.
+# For RAS-oriented NIfTI, BIDS uses:
+#   j  = posterior→anterior  => PA
+#   j- = anterior→posterior  => AP
 _PED_MAP_TO_DIR_FOR_RAS: Dict[str, str] = {
-    "i": "LR",  # Left→Right
+    "i": "LR",   # Left→Right
     "i-": "RL",  # Right→Left
-    "j": "PA",  # Posterior→Anterior
+    "j": "PA",   # Posterior→Anterior
     "j-": "AP",  # Anterior→Posterior
-    "k": "IS",  # Inferior→Superior
+    "k": "IS",   # Inferior→Superior
     "k-": "SI",  # Superior→Inferior
 }
-
 
 def infer_dir_tag(dest_dir: Path, events_fname: str) -> str | None:
     """Return a ``dir-`` entity for *events_fname* based on BOLD metadata.
